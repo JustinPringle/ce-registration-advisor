@@ -1,0 +1,29 @@
+# Curriculum structure. Slots only — module detail lives in modules.yaml.
+
+ENCV:
+  name: BSc Eng (Civil Engineering)
+  stream: mainstream
+  semesters:
+    - {year: 1, block: 1, modules: [CHEM181, ENCH1TC, ENME1DR, MATH131, MATH132, PHYS151]}
+    - {year: 1, block: 2, modules: [CHEM191, ENCV1ED, ENME1EM, MATH141, MATH142, PHYS152, ENCV1EP]}
+    - {year: 2, block: 1, modules: [ENCV2MT, ENCV2SA, ENSV2SE, MATH238, ZULN101]}
+    - {year: 2, block: 2, modules: [ENCV2FL, ENCV2MW, ENCV2SB, ENCV2SD, GEOL215, MATH248]}
+    - {year: 3, block: 1, modules: [ENCV3FA, ENCV3G1, ENCV3ST, ENCV3TT, STAT370]}
+    - {year: 3, block: 2, modules: [ENCV3CW, ENCV3FB, ENCV3G2, ENCV3SD, ENCV3TP, ENCV3MS]}
+    - {year: 4, block: 1, modules: [ENCH4ML, ENCV4GS, ENCV4TE, ENCV4WE, ENPD7PP]}
+    - {year: 4, block: 2, modules: [ENCV4DE, ENCV4DS, ENCV4VW, ENPD7CL]}
+
+ENGEAP:
+  name: BSc Eng (Civil) — Augmented
+  stream: augmented
+  semesters:
+    - {year: 0, block: 1, modules: [MATH160, PHYS160, ENCH160, ENME160]}
+    - {year: 0, block: 2, modules: [MATH161, PHYS163, ENAG160, ENAG161]}
+    - {year: 1, block: 1, modules: [CHEM181, MATH132]}
+    - {year: 1, block: 2, modules: [CHEM191, MATH142, ENCV1EP]}
+    - {year: 2, block: 1, modules: [ENCV2MT, ENCV2SA, ENSV2SE, MATH238, ZULN101]}
+    - {year: 2, block: 2, modules: [ENCV2FL, ENCV2MW, ENCV2SB, ENCV2SD, GEOL215, MATH248]}
+    - {year: 3, block: 1, modules: [ENCV3FA, ENCV3G1, ENCV3ST, ENCV3TT, STAT370]}
+    - {year: 3, block: 2, modules: [ENCV3CW, ENCV3FB, ENCV3G2, ENCV3SD, ENCV3TP, ENCV3MS]}
+    - {year: 4, block: 1, modules: [ENCH4ML, ENCV4GS, ENCV4TE, ENCV4WE, ENPD7PP]}
+    - {year: 4, block: 2, modules: [ENCV4DE, ENCV4DS, ENCV4VW, ENPD7CL]}

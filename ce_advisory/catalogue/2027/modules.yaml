@@ -1,0 +1,429 @@
+# Civil Engineering module catalogue — handbook year 2027
+#
+# prereq_status is an audit field, not decoration:
+#   handbook   verified against the handbook prereq column — trustworthy
+#   inferred   derived from the template but interpreted/surprising — VERIFY
+#   none       module genuinely has no prerequisites — verified
+#   unverified not yet checked at all
+#
+# `catalogue.unverified_prereqs()` lists everything still outstanding.
+# Nothing goes student-facing while that list is non-empty.
+#
+# Prereq expressions revised against the handbook column of
+# Course_insert_sheet_with_prereqs.xlsx. Level gates live in progression.yaml
+# and are referenced with `prerequisites: {gate: <name>}`.
+
+# ---------------------------------------------------------------- Year 1 S1
+CHEM181:
+  name: Chemistry for Engineers 1A
+  credits: 8
+  level: 1
+  offered: [1]
+  prereq_status: none
+
+ENCH1TC:
+  name: Technical Communication for Engineers
+  credits: 8
+  level: 1
+  offered: [1]
+  prereq_status: none
+  substitutes: [ENCH160]
+
+ENME1DR:
+  name: Engineering Drawing
+  credits: 8
+  level: 1
+  offered: [1]
+  prereq_status: none
+  substitutes: [ENME160]
+
+MATH131:
+  name: Engineering Mathematics 1A
+  credits: 16
+  level: 1
+  offered: [1]
+  prereq_status: none
+  substitutes: [MATH160]
+
+MATH132:
+  name: Engineering Mathematics 1B
+  credits: 16
+  level: 1
+  offered: [1]
+  prereq_status: none
+
+PHYS151:
+  name: Engineering Physics 1A
+  credits: 16
+  level: 1
+  offered: [1]
+  prereq_status: none
+  # handbook co-req: MATH130 or MATH195 (neither in the Civil catalogue).
+  substitutes: [PHYS160]
+
+# ---------------------------------------------------------------- Year 1 S2
+CHEM191:
+  name: Chemistry for Engineers 1B
+  credits: 8
+  level: 1
+  offered: [2]
+  prereq_status: handbook
+  prerequisites: {passed: CHEM181}
+
+ENCV1ED:
+  name: Introduction to Engineering Design
+  credits: 8
+  level: 1
+  offered: [2]
+  prereq_status: handbook       # was 'none' with no rule — handbook requires ENME1DR
+  prerequisites: {passed: ENME1DR}
+  substitutes: [ENAG160]
+
+ENME1EM:
+  name: Introduction to Engineering Materials
+  credits: 8
+  level: 1
+  offered: [2]
+  prereq_status: none           # handbook column carries no prerequisite
+  substitutes: [ENAG161]
+
+MATH141:
+  name: Engineering Mathematics 1C
+  credits: 16
+  level: 1
+  offered: [2]
+  prereq_status: handbook
+  prerequisites: {passed: MATH131}
+  substitutes: [MATH161]
+
+MATH142:
+  name: Engineering Mathematics 1D
+  credits: 16
+  level: 1
+  offered: [2]
+  prereq_status: handbook       # fixed: YAML had duplicate `passed:` keys → only MATH131 survived
+  prerequisites:
+    all_of:
+      - passed: MATH131
+      - passed: MATH132
+
+PHYS152:
+  name: Engineering Physics 1B
+  credits: 16
+  level: 1
+  offered: [2]
+  prereq_status: handbook
+  prerequisites: {passed: PHYS151}
+  substitutes: [PHYS163]
+
+ENCV1EP:
+  name: Engineering Practice 1
+  credits: 0
+  level: 1
+  offered: [2]
+  kind: dp
+  prereq_status: none
+
+# ---------------------------------------------------------------- Year 2 S1
+ENCV2MT:
+  name: Civil Engineering Materials
+  credits: 8
+  level: 2
+  offered: [1]
+  prereq_status: handbook       # was 'unverified' — handbook requires ENME1EM
+  prerequisites: {passed: ENME1EM}
+
+ENCV2SA:
+  name: Structures 1
+  credits: 16
+  level: 2
+  offered: [1]
+  prereq_status: handbook       # was inferred all_of[ENME1EM, MATH141] — handbook is MATH141;MATH142
+  prerequisites:
+    all_of:
+      - passed: MATH141
+      - passed: MATH142
+
+ENSV2SE:
+  name: Surveying for Engineers
+  credits: 16
+  level: 2
+  offered: [1]
+  prereq_status: inferred       # gate: 'core' credit scope is interpreted — VERIFY
+  prerequisites: {gate: survey_geology_entry}
+
+MATH238:
+  name: Engineering Mathematics 2A
+  credits: 16
+  level: 2
+  offered: [1]
+  prereq_status: handbook       # fixed malformed node — handbook is MATH131;MATH141
+  prerequisites:
+    all_of:
+      - passed: MATH131
+      - passed: MATH141
+
+ZULN101:
+  name: Zulu for Beginners
+  credits: 16
+  level: 1
+  offered: [1]
+  kind: elective
+  prereq_status: none
+
+# ---------------------------------------------------------------- Year 2 S2
+ENCV2FL:
+  name: Fluids 1
+  credits: 8
+  level: 2
+  offered: [2]
+  prereq_status: inferred       # was inferred[MATH141,PHYS151]; handbook MATH142; PHYS151 (or PHYS110, not in catalogue)
+  prerequisites:
+    all_of:
+      - passed: MATH142
+      - passed: PHYS151
+
+ENCV2MW:
+  name: Materials Workshop
+  credits: 0
+  level: 2
+  offered: [2]
+  kind: dp
+  prereq_status: none           # handbook lists ENCV2MT (DP) — DP-on-DP, tracked out of band
+
+ENCV2SB:
+  name: Structures 2
+  credits: 16
+  level: 2
+  offered: [2]
+  prereq_status: handbook
+  prerequisites: {passed: ENCV2SA}
+
+ENCV2SD:
+  name: Structural Design 1
+  credits: 16
+  level: 2
+  offered: [2]
+  prereq_status: handbook       # was 'unverified' — handbook requires ENCV2SA
+  prerequisites: {passed: ENCV2SA}
+
+GEOL215:
+  name: Elements of Geology for Civil Engineering
+  credits: 16
+  level: 2
+  offered: [2]
+  prereq_status: inferred       # gate: 'core' credit scope is interpreted — VERIFY
+  prerequisites: {gate: survey_geology_entry}
+
+MATH248:
+  name: Engineering Mathematics 2B
+  credits: 16
+  level: 2
+  offered: [2]
+  prereq_status: handbook       # fixed malformed node — handbook is MATH238;MATH141 (not MATH131)
+  prerequisites:
+    all_of:
+      - passed: MATH238
+      - passed: MATH141
+
+# ---------------------------------------------------------------- Year 3 S1
+ENCV3FA:
+  name: Fluids 2
+  credits: 16
+  level: 3
+  offered: [1]
+  prereq_status: handbook       # was inferred[ENCV2FL, MATH248] — handbook is ENCV2FL only
+  prerequisites: {passed: ENCV2FL}
+
+ENCV3G1:
+  name: Geotechnical Engineering Studies 1
+  credits: 16
+  level: 3
+  offered: [1]
+  prereq_status: handbook       # was inferred {passed: GEOL215} (wrong) — handbook is the credit/level/first-year gate
+  prerequisites: {gate: geotech1_entry}
+
+ENCV3ST:
+  name: Structures 3
+  credits: 16
+  level: 3
+  offered: [1]
+  prereq_status: handbook       # was inferred {passed: ENCV2SB} — handbook is ENCV2SA;ENCV2SB
+  prerequisites:
+    all_of:
+      - passed: ENCV2SA
+      - passed: ENCV2SB
+
+ENCV3TT:
+  name: Transport 1
+  credits: 16
+  level: 3
+  offered: [1]
+  prereq_status: handbook       # was 'unverified' — handbook gate: 3rd year of study
+  prerequisites: {gate: in_third_year}
+
+STAT370:
+  name: Engineering Statistics
+  credits: 8
+  level: 3
+  offered: [1]
+  prereq_status: inferred       # handbook 'MATH248 (DP)' — (DP) qualifier not modelled, VERIFY
+  prerequisites: {passed: MATH248}
+
+# ---------------------------------------------------------------- Year 3 S2
+ENCV3CW:
+  name: Civil CADD Workshop
+  credits: 0
+  level: 3
+  offered: [2]
+  kind: dp
+  prereq_status: none           # handbook lists ENCV3ST (DP); ENCV2SD — tracked out of band
+
+ENCV3FB:
+  name: Fluids 3
+  credits: 16
+  level: 3
+  offered: [2]
+  prereq_status: inferred       # was inferred {passed: ENCV3FA}; handbook is ENCV2FL; STAT370 — SURPRISING, VERIFY
+  prerequisites:
+    all_of:
+      - passed: ENCV2FL
+      - passed: STAT370
+
+ENCV3G2:
+  name: Geotechnical Engineering Studies 2
+  credits: 16
+  level: 3
+  offered: [2]
+  prereq_status: handbook
+  prerequisites: {passed: ENCV3G1}
+
+ENCV3SD:
+  name: Structural Design 2
+  credits: 16
+  level: 3
+  offered: [2]
+  prereq_status: handbook       # was inferred {passed: ENCV3ST} — handbook is ENCV2SD;ENCV3ST
+  prerequisites:
+    all_of:
+      - passed: ENCV2SD
+      - passed: ENCV3ST
+
+ENCV3TP:
+  name: Transport 2
+  credits: 8
+  level: 3
+  offered: [2]
+  prereq_status: handbook       # was inferred {passed: ENCV3TT} — handbook is ENCV3G1;ENCV3TT;GEOL215
+  prerequisites:
+    all_of:
+      - passed: ENCV3G1
+      - passed: ENCV3TT
+      - passed: GEOL215
+
+ENCV3MS:
+  name: Mathematical Systems
+  credits: 8
+  level: 3
+  offered: [2]
+  prereq_status: handbook       # was 'unverified' — handbook is MATH238;MATH248;STAT370
+  prerequisites:
+    all_of:
+      - passed: MATH238
+      - passed: MATH248
+      - passed: STAT370
+
+# ---------------------------------------------------------------- Year 4 S1
+ENCH4ML:
+  name: Engineering Management and Labour Relations
+  credits: 8
+  level: 4
+  offered: [1]
+  prereq_status: handbook       # was 'unverified' — handbook gate: all 1st year + 96cr of 2nd year
+  prerequisites: {gate: eng_management_entry}
+
+ENCV4GS:
+  name: Ground and Structural Engineering
+  credits: 16
+  level: 4
+  offered: [1]
+  prereq_status: handbook       # was inferred[ENCV3G2,ENCV3SD] — handbook is ENCV3G1;ENCV3G2;ENCV3SD;ENCV3ST
+  prerequisites:
+    all_of:
+      - passed: ENCV3G1
+      - passed: ENCV3G2
+      - passed: ENCV3SD
+      - passed: ENCV3ST
+
+ENCV4TE:
+  name: Transport and Environmental Management
+  credits: 16
+  level: 4
+  offered: [1]
+  prereq_status: handbook       # was inferred {passed: ENCV3TP} (wrong) — handbook is ENCV3TT
+  prerequisites: {passed: ENCV3TT}
+
+ENCV4WE:
+  name: Water and Environmental Engineering
+  credits: 16
+  level: 4
+  offered: [1]
+  prereq_status: handbook       # was inferred {passed: ENCV3FB} — handbook is ENCV2FL;ENCV3FA;ENCV3FB
+  prerequisites:
+    all_of:
+      - passed: ENCV2FL
+      - passed: ENCV3FA
+      - passed: ENCV3FB
+
+ENPD7PP:
+  name: Professional Practice
+  credits: 8
+  level: 4
+  offered: [1]
+  prereq_status: handbook       # was 'unverified' — handbook gate: registered in 4th year
+  prerequisites: {gate: fourth_year_only}
+
+# ---------------------------------------------------------------- Year 4 S2
+ENCV4DE:
+  name: Civil Engineering Design Project
+  credits: 24
+  level: 4
+  offered: [2]
+  prereq_status: handbook       # was inferred {credits_at_least: 384} — handbook is 'passed all preceding core'
+  prerequisites: {gate: final_capstone_entry}
+
+ENCV4DS:
+  name: Dissertation
+  credits: 24
+  level: 4
+  offered: [2]
+  prereq_status: handbook       # was inferred {credits_at_least: 384} — handbook is 'passed all preceding core'
+  prerequisites: {gate: final_capstone_entry}
+
+ENCV4VW:
+  name: Practical Vacation Work
+  credits: 0
+  level: 4
+  offered: [2]
+  kind: dp
+  prereq_status: none
+
+ENPD7CL:
+  name: Management of Construction Contracts
+  credits: 8
+  level: 4
+  offered: [2]
+  prereq_status: handbook       # was 'unverified' — handbook gate: registered in 4th year
+  prerequisites: {gate: fourth_year_only}
+
+# ------------------------------------------------- Augmented (substituting)
+# These carry no curriculum slot of their own; they fill a mainstream slot
+# via that module's `substitutes` list.
+MATH160: {name: Augmented Mathematics 1A, credits: 16, level: 1, offered: [1], prereq_status: none}
+MATH161: {name: Augmented Mathematics 1C, credits: 16, level: 1, offered: [2], prereq_status: none}
+PHYS160: {name: Augmented Physics 1A, credits: 16, level: 1, offered: [1], prereq_status: none}
+PHYS163: {name: Augmented Physics 1B, credits: 16, level: 1, offered: [2], prereq_status: none}
+ENCH160: {name: Augmented Technical Communication, credits: 8, level: 1, offered: [1], prereq_status: none}
+ENME160: {name: Augmented Engineering Drawing, credits: 8, level: 1, offered: [1], prereq_status: none}
+ENAG160: {name: Augmented Engineering Design, credits: 8, level: 1, offered: [2], prereq_status: none}
+ENAG161: {name: Augmented Engineering Mechanics, credits: 8, level: 1, offered: [2], prereq_status: none}

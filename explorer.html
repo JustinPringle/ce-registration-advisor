@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalogue explorer — CE Registration Advisory</title>
+<style>
+:root{
+  --paper:#F3F5EF; --band:#E7ECE1; --ink:#1B2620; --ink2:#5D6C62; --ink3:#8C998F;
+  --rule:#C3CCBE; --rule-hard:#9EAB9C;
+  --blue:#2E5A9C; --blue-soft:#DDE6F3;
+  --pass-fill:#CDE5D2; --pass-ink:#1E5C37;
+  --merit-fill:#1E5C37; --fail-fill:#F0CEC9; --fail-ink:#8E271D;
+  --supp-fill:#F6E4AE; --aug-fill:#CDDCF0;
+  --block-fill:#E0E2DC; --must-bar:#C86A1E;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:14px; line-height:1.5;
+  background-image:linear-gradient(90deg,rgba(0,0,0,.02) 1px,transparent 1px);
+  background-size:28px 100%;
+}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer}
+.mono{font-family:var(--mono)}
+
+/* ---------- printout header ---------- */
+header{
+  border-bottom:2px solid var(--ink); padding:14px 22px 10px;
+  display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
+  background:var(--paper); position:sticky; top:0; z-index:20;
+}
+header h1{
+  font-family:var(--mono); font-size:13px; letter-spacing:.18em;
+  text-transform:uppercase;
+}
+header .meta{
+  font-family:var(--mono); font-size:11px; color:var(--ink2);
+  letter-spacing:.08em; text-transform:uppercase;
+}
+header .meta b{color:var(--ink);font-weight:600}
+.spacer{flex:1}
+
+/* ---------- toolbar ---------- */
+.toolbar{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  padding:10px 22px; border-bottom:1px solid var(--rule);
+  position:sticky; top:47px; background:var(--paper); z-index:19;
+}
+.toolbar .label{
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink3); margin-right:2px;
+}
+.chip{
+  border:1px solid var(--rule-hard); background:transparent; border-radius:2px;
+  padding:4px 10px; font-family:var(--mono); font-size:11px;
+  letter-spacing:.06em; text-transform:uppercase; transition:background .12s,border-color .12s;
+}
+.chip:hover{background:var(--band)}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+select.chip{padding:4px 6px}
+
+/* ---------- layout ---------- */
+main{
+  display:grid; grid-template-columns:minmax(0,1fr) 340px;
+  gap:0; align-items:start;
+}
+.sheet-wrap{position:relative; padding:0 0 40px}
+#leaders{position:absolute; inset:0; pointer-events:none; z-index:5; overflow:visible}
+
+/* ---------- greenbar semester rows ---------- */
+.sem{border-bottom:1px solid var(--rule); padding:10px 22px 14px}
+.sem:nth-child(even){background:var(--band)}
+.sem-head{
+  display:flex; align-items:baseline; gap:14px; margin-bottom:8px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+}
+.sem-head .yr{color:var(--ink); font-weight:600}
+.sem-head .cr{color:var(--ink2)}
+.sem-head .gauge{
+  flex:1; height:3px; background:var(--rule); position:relative; max-width:220px;
+}
+.sem-head .gauge i{
+  position:absolute; inset:0 auto 0 0; background:var(--pass-ink);
+  transition:width .35s cubic-bezier(.4,0,.2,1);
+}
+.sem-head .prog{
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  padding:1px 6px; border-radius:2px; border:1px solid var(--rule-hard);
+}
+.sem-head .prog.met{color:var(--pass-ink); border-color:var(--pass-ink)}
+.sem-head .prog.short{color:var(--fail-ink); border-color:var(--fail-ink)}
+.grid{display:flex; flex-wrap:wrap; gap:6px}
+
+/* ---------- module cell: the insert-sheet box ---------- */
+.cell{
+  position:relative; width:132px; text-align:left; padding:7px 9px 8px;
+  border:1px solid var(--rule-hard); border-radius:2px; background:var(--paper);
+  transition:background .18s, border-color .12s, transform .12s;
+}
+.cell:hover{border-color:var(--ink)}
+.cell:focus-visible{outline:2px solid var(--blue); outline-offset:2px}
+.cell .code{font-family:var(--mono); font-size:12.5px; letter-spacing:.03em; font-weight:600}
+.cell .sub{
+  font-family:var(--mono); font-size:9.5px; color:var(--ink2);
+  letter-spacing:.06em; margin-top:2px; display:flex; gap:6px;
+}
+.cell .flag{
+  position:absolute; top:-1px; right:-1px; width:0; height:0;
+  border-top:9px solid var(--ink3); border-left:9px solid transparent;
+}
+.cell[data-prereq="inferred"] .flag{border-top-color:var(--must-bar)}
+.cell[data-prereq="unverified"] .flag{border-top-color:var(--fail-ink)}
+.cell[data-prereq="none"] .flag, .cell[data-prereq="handbook"] .flag{display:none}
+
+.cell[data-state="passed"]{background:var(--pass-fill); border-color:var(--pass-ink)}
+.cell[data-state="passed"] .code{color:var(--pass-ink)}
+.cell[data-state="failed"]{background:var(--fail-fill); border-color:var(--fail-ink)}
+.cell[data-state="failed"] .code{color:var(--fail-ink)}
+.cell[data-elig="blocked"]{background:var(--block-fill); color:var(--ink3);
+  background-image:repeating-linear-gradient(135deg,transparent 0 5px,rgba(0,0,0,.045) 5px 6px)}
+.cell[data-elig="blocked"] .code{color:var(--ink2)}
+.cell[data-elig="must"]{box-shadow:inset 3px 0 0 var(--must-bar)}
+.cell[data-kind="dp"]{border-style:dashed}
+.cell.dim{opacity:.28}
+.cell.selected{border-color:var(--blue); box-shadow:0 0 0 2px var(--blue-soft)}
+.cell.culprit{border-color:var(--must-bar); box-shadow:0 0 0 2px #F0DCC6}
+
+/* ---------- inspector ---------- */
+aside{
+  position:sticky; top:96px; border-left:1px solid var(--rule);
+  padding:14px 18px 40px; height:calc(100vh - 96px); overflow-y:auto;
+}
+aside h2{
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink2); margin-bottom:8px;
+}
+.insp-code{font-family:var(--mono); font-size:22px; letter-spacing:.02em}
+.insp-name{color:var(--ink2); margin:2px 0 10px}
+.facts{
+  display:grid; grid-template-columns:auto 1fr; gap:2px 12px;
+  font-family:var(--mono); font-size:11px; margin-bottom:14px;
+}
+.facts dt{color:var(--ink3); letter-spacing:.08em; text-transform:uppercase}
+.facts dd{margin:0}
+.verdict{
+  border:1px solid var(--rule-hard); border-left-width:3px; padding:8px 10px;
+  margin-bottom:14px; font-size:13px;
+}
+.verdict.may{border-left-color:var(--blue)}
+.verdict.must{border-left-color:var(--must-bar)}
+.verdict.blocked{border-left-color:var(--fail-ink)}
+.verdict.done{border-left-color:var(--pass-ink)}
+.verdict b{font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; display:block; margin-bottom:3px}
+.verdict ul{margin:6px 0 0; padding-left:16px}
+.verdict li{margin:2px 0}
+
+/* prerequisite expression tree */
+.tree{font-family:var(--mono); font-size:11.5px; line-height:1.75}
+.tree ul{list-style:none; margin:0; padding-left:14px; border-left:1px dotted var(--rule-hard)}
+.tree li{position:relative; padding-left:12px}
+.tree li::before{
+  content:""; position:absolute; left:0; top:.7em; width:8px;
+  border-top:1px dotted var(--rule-hard);
+}
+.tree .op{color:var(--ink3); letter-spacing:.1em; text-transform:uppercase}
+.tree .met{color:var(--pass-ink)}
+.tree .unmet{color:var(--fail-ink)}
+.tree .met::after{content:" ✓"}
+.tree .unmet::after{content:" ✗"}
+.deps{font-family:var(--mono); font-size:11px; display:flex; flex-wrap:wrap; gap:4px}
+.deps a{
+  color:var(--blue); text-decoration:none; border-bottom:1px solid var(--blue-soft);
+  cursor:pointer;
+}
+.deps a:hover{border-bottom-color:var(--blue)}
+.empty{color:var(--ink3); font-size:12.5px}
+hr{border:0; border-top:1px solid var(--rule); margin:16px 0}
+
+/* ---------- status strip ---------- */
+footer{
+  position:fixed; left:0; right:340px; bottom:0; z-index:20;
+  border-top:2px solid var(--ink); background:var(--paper);
+  display:flex; gap:0; align-items:stretch;
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+}
+footer div{padding:7px 16px; border-right:1px solid var(--rule); display:flex; gap:7px; align-items:center}
+footer .k{color:var(--ink3); text-transform:uppercase}
+footer .v{font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.ok{background:var(--pass-ink)} .bad{background:var(--fail-ink)}
+
+@media (max-width:900px){
+  main{grid-template-columns:1fr}
+  aside{position:static;height:auto;border-left:0;border-top:1px solid var(--rule)}
+  footer{right:0;position:static}
+  .cell{width:calc(50% - 3px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Catalogue explorer</h1>
+  <span class="meta">Handbook <b id="hb">—</b></span>
+  <span class="meta">Programme <b id="progName">—</b></span>
+  <span class="spacer"></span>
+  <span class="meta" id="privacy">No student data — catalogue only</span>
+</header>
+
+<div class="toolbar">
+  <span class="label">Programme</span>
+  <select class="chip" id="progSel"></select>
+  <span class="label">Show</span>
+  <button class="chip" id="fBlocked" aria-pressed="false">Blocked only</button>
+  <button class="chip" id="fUnver" aria-pressed="false">Unverified rules</button>
+  <span class="label">Year of study</span>
+  <select class="chip" id="yosSel"></select>
+  <span class="label">Sem reg</span>
+  <select class="chip" id="semSel"></select>
+  <span class="spacer"></span>
+  <span class="label">Scenario</span>
+  <button class="chip" id="passY1">Pass year 1</button>
+  <button class="chip" id="passY2">Pass through year 2</button>
+  <button class="chip" id="clear">Clear</button>
+</div>
+
+<main>
+  <div class="sheet-wrap">
+    <svg id="leaders"></svg>
+    <div id="sheet"></div>
+  </div>
+  <aside id="inspector"></aside>
+</main>
+
+<footer>
+  <div><span class="k">Credits passed</span><span class="v" id="sCred">0</span></div>
+  <div><span class="k">Must</span><span class="v" id="sMust">0</span></div>
+  <div><span class="k">May</span><span class="v" id="sMay">0</span></div>
+  <div><span class="k">Blocked</span><span class="v" id="sBlocked">0</span></div>
+  <div><span class="k">Evaluator parity</span><span class="dot" id="pDot"></span><span class="v" id="sParity">—</span></div>
+</footer>
+
+<script>
+const CATALOGUE = {"handbookYear": 2027, "modules": {"CHEM181": {"name": "Chemistry for Engineers 1A", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH1TC": {"name": "Technical Communication for Engineers", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENCH160"]}, "ENME1DR": {"name": "Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENME160"]}, "MATH131": {"name": "Engineering Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["MATH160"]}, "MATH132": {"name": "Engineering Mathematics 1B", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS151": {"name": "Engineering Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["PHYS160"]}, "CHEM191": {"name": "Chemistry for Engineers 1B", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "CHEM181"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV1ED": {"name": "Introduction to Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENME1DR"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["ENAG160"]}, "ENME1EM": {"name": "Introduction to Engineering Materials", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENAG161"]}, "MATH141": {"name": "Engineering Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "MATH131"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["MATH161"]}, "MATH142": {"name": "Engineering Mathematics 1D", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH132"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "PHYS152": {"name": "Engineering Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "PHYS151"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["PHYS163"]}, "ENCV1EP": {"name": "Engineering Practice 1", "credits": 0, "level": 1, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2MT": {"name": "Civil Engineering Materials", "credits": 8, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENME1EM"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SA": {"name": "Structures 1", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH141"}, {"passed": "MATH142"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENSV2SE": {"name": "Surveying for Engineers", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH238": {"name": "Engineering Mathematics 2A", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ZULN101": {"name": "Zulu for Beginners", "credits": 16, "level": 1, "offered": [1], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2FL": {"name": "Fluids 1", "credits": 8, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH142"}, {"passed": "PHYS151"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV2MW": {"name": "Materials Workshop", "credits": 0, "level": 2, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2SB": {"name": "Structures 2", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SD": {"name": "Structural Design 1", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "GEOL215": {"name": "Elements of Geology for Civil Engineering", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH248": {"name": "Engineering Mathematics 2B", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3FA": {"name": "Fluids 2", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV2FL"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3G1": {"name": "Geotechnical Engineering Studies 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"credits_at_least": 144}, {"passed_at_level": {"level": 2, "credits": 32}}, {"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3ST": {"name": "Structures 3", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SA"}, {"passed": "ENCV2SB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TT": {"name": "Transport 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 3}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "STAT370": {"name": "Engineering Statistics", "credits": 8, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "MATH248"}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3CW": {"name": "Civil CADD Workshop", "credits": 0, "level": 3, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV3FB": {"name": "Fluids 3", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3G2": {"name": "Geotechnical Engineering Studies 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV3G1"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3SD": {"name": "Structural Design 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TP": {"name": "Transport 2", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3TT"}, {"passed": "GEOL215"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3MS": {"name": "Mathematical Systems", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH248"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCH4ML": {"name": "Engineering Management and Labour Relations", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}, {"credits_from": {"group": "second_year_core", "members": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"], "at_least": 96}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4GS": {"name": "Ground and Structural Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3G2"}, {"passed": "ENCV3SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4TE": {"name": "Transport and Environmental Management", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV3TT"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4WE": {"name": "Water and Environmental Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "ENCV3FA"}, {"passed": "ENCV3FB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENPD7PP": {"name": "Professional Practice", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DE": {"name": "Civil Engineering Design Project", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DS": {"name": "Dissertation", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4VW": {"name": "Practical Vacation Work", "credits": 0, "level": 4, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENPD7CL": {"name": "Management of Construction Contracts", "credits": 8, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "MATH160": {"name": "Augmented Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "MATH161": {"name": "Augmented Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS160": {"name": "Augmented Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS163": {"name": "Augmented Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH160": {"name": "Augmented Technical Communication", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENME160": {"name": "Augmented Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG160": {"name": "Augmented Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG161": {"name": "Augmented Engineering Mechanics", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}}, "programmes": {"CIVIL": {"name": "Civil Engineering (mainstream)", "stream": "mainstream", "semesters": [{"year": 1, "block": 1, "modules": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"]}, {"year": 1, "block": 2, "modules": ["CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP"]}, {"year": 2, "block": 1, "modules": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ZULN101"]}, {"year": 2, "block": 2, "modules": ["ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"]}, {"year": 3, "block": 1, "modules": ["ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370"]}, {"year": 3, "block": 2, "modules": ["ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS"]}, {"year": 4, "block": 1, "modules": ["ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}, {"year": 4, "block": 2, "modules": ["ENCV4DE", "ENCV4DS", "ENCV4VW", "ENPD7CL"]}]}}, "unverified": ["ENCV2FL", "ENCV3FB", "ENSV2SE", "GEOL215", "STAT370"], "progression": {"normalSemesterLoad": 72, "streams": {"mainstream": {"1": [48, 72, 54], "2": [96, 144, 108], "3": [144, 216, 162], "4": [192, 288, 216], "5": [240, 360, 270], "6": [288, 432, 324], "7": [336, 504, 378], "8": [384, 576, 432], "9": [432, null, null], "10": [480, null, null], "11": [528, null, null], "12": [576, null, null]}, "augmented": {"1": [0, 16, 0], "2": [32, 64, 48], "3": [56, 104, 78], "4": [96, 176, 132], "5": [144, 240, 180], "6": [192, 304, 228], "7": [240, 368, 276], "8": [288, 432, 324], "9": [336, 504, null], "10": [384, 576, null], "11": [432, null, null], "12": [480, null, null], "13": [528, null, null], "14": [576, null, null]}}}};
+const PARITY    = [{"module": "CHEM181", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 1, "semestersRegistered": 1, "ok": true, "unmet": []}, {"module": "ENCV2SA", "passed": ["MATH141"], "credits": 16, "creditsByLevel": {"1": 16}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you have not passed MATH142"]}, {"module": "MATH248", "passed": ["MATH141", "MATH238"], "credits": 32, "creditsByLevel": {"2": 16, "1": 16}, "yearOfStudy": 2, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3FA", "passed": ["ENCV2FL"], "credits": 8, "creditsByLevel": {"2": 8}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you must be in year 3 of study (currently year 2)"]}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 3, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 6, "ok": false, "unmet": ["you must be in year 4 of study (currently year 3)"]}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 4, "semestersRegistered": 6, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["MATH131", "MATH132", "PHYS151"], "credits": 48, "creditsByLevel": {"1": 48}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you need 62 credits at Level 1 and have 48"]}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 1, "ok": false, "unmet": ["you need 2 registered semesters and have 1"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": false, "unmet": ["you need 32 credits at Level 2 and have 0"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENCV2SA", "ENCV2SB", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 176, "creditsByLevel": {"1": 144, "2": 32}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV4DE", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": false, "unmet": ["36 of preceding_core still outstanding: CHEM181, ENCH1TC, ENME1DR, MATH131 \u2026"]}, {"module": "ENCV4DE", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCH4ML", "ENCV1ED", "ENCV2FL", "ENCV2MT", "ENCV2SA", "ENCV2SB", "ENCV2SD", "ENCV3FA", "ENCV3FB", "ENCV3G1", "ENCV3G2", "ENCV3MS", "ENCV3SD", "ENCV3ST", "ENCV3TP", "ENCV3TT", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENME1DR", "ENME1EM", "ENPD7PP", "ENSV2SE", "GEOL215", "MATH131", "MATH132", "MATH141", "MATH142", "MATH238", "MATH248", "PHYS151", "PHYS152", "STAT370"], "credits": 472, "creditsByLevel": {"1": 144, "2": 128, "3": 136, "4": 64}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": true, "unmet": []}];
+
+/* ------------------------------------------------------------------
+   Prerequisite evaluator — mirror of ce_advisory/rules/prereq.py.
+   Python is authoritative; the footer chip verifies this copy agrees.
+------------------------------------------------------------------ */
+function evaluate(node, ctx){
+  if(!node) return {ok:true, reason:"no prerequisites", children:[]};
+  const op = Object.keys(node)[0], arg = node[op];
+  switch(op){
+    case "passed":{
+      const ok = ctx.passed.has(arg);
+      return {ok, reason: ok ? `passed ${arg}` : `you have not passed ${arg}`, children:[], ref:arg};
+    }
+    case "registered_for":{
+      const ok = ctx.registered.has(arg) || ctx.passed.has(arg);
+      return {ok, reason: ok ? `registered for ${arg}` : `you must also register for ${arg}`, children:[], ref:arg};
+    }
+    case "credits_at_least":{
+      const ok = ctx.credits >= arg;
+      return {ok, reason: ok
+        ? `${ctx.credits} credits passed (needs ${arg})`
+        : `you need ${arg} credits and have ${ctx.credits} (${arg-ctx.credits} short)`, children:[]};
+    }
+    case "passed_at_level":{
+      const have = ctx.byLevel[arg.level] || 0, ok = have >= arg.credits;
+      return {ok, reason: ok
+        ? `${have} credits at Level ${arg.level} (needs ${arg.credits})`
+        : `you need ${arg.credits} credits at Level ${arg.level} and have ${have}`, children:[]};
+    }
+    /* ---- level-gate leaves (mirror ce_advisory/rules/prereq.py) ---- */
+    case "year_of_study":{
+      const need = arg.at_least, ok = ctx.yearOfStudy >= need;
+      return {ok, reason: ok
+        ? `in year ${ctx.yearOfStudy} of study (needs ${need})`
+        : `you must be in year ${need} of study (currently year ${ctx.yearOfStudy || "—"})`,
+        children:[]};
+    }
+    case "semesters_registered":{
+      const need = arg.at_least, ok = ctx.semestersRegistered >= need;
+      return {ok, reason: ok
+        ? `${ctx.semestersRegistered} semesters registered (needs ${need})`
+        : `you need ${need} registered semesters and have ${ctx.semestersRegistered}`,
+        children:[]};
+    }
+    case "credits_from":{
+      const have = arg.members.filter(m => ctx.passed.has(m))
+                     .reduce((a,m)=> a + ((M[m] && M[m].credits) || 0), 0);
+      const need = arg.at_least, label = arg.group || "the set", ok = have >= need;
+      return {ok, reason: ok
+        ? `${have} credits from ${label} (needs ${need})`
+        : `you need ${need} credits from ${label} and have ${have}`, children:[]};
+    }
+    case "passed_all":{
+      const label = arg.group || "the set";
+      const outstanding = arg.members.filter(m => !ctx.passed.has(m));
+      const ok = outstanding.length === 0;
+      if(ok) return {ok, reason:`passed all of ${label}`, children:[], refs:[]};
+      const shown = outstanding.slice(0,4).join(", ") + (outstanding.length > 4 ? " …" : "");
+      return {ok, reason:`${outstanding.length} of ${label} still outstanding: ${shown}`,
+        children:[], refs:outstanding};
+    }
+    case "all_of":{
+      const children = arg.map(n => evaluate(n, ctx)), ok = children.every(c => c.ok);
+      return {ok, reason: ok ? "all requirements met" : "not all requirements met", children, op};
+    }
+    case "any_of":{
+      const children = arg.map(n => evaluate(n, ctx)), ok = children.some(c => c.ok);
+      return {ok, reason: ok ? children.find(c=>c.ok).reason
+        : "none of the alternatives is met: " + children.map(c=>c.reason).join("; or "), children, op};
+    }
+    case "n_of":{
+      const children = arg.of.map(n => evaluate(n, ctx));
+      const met = children.filter(c=>c.ok).length;
+      return {ok: met >= arg.n, reason:`${met} of ${arg.n} required alternatives met`, children, op};
+    }
+    default: throw new Error("unknown operator " + op);
+  }
+}
+function unmet(out){
+  if(out.ok) return [];
+  if(!out.children.length) return [out.reason];
+  return out.children.filter(c=>!c.ok).flatMap(unmet);
+}
+function unmetRefs(out){
+  if(out.ok) return [];
+  if(!out.children.length) return out.ref ? [out.ref] : (out.refs || []);
+  return out.children.filter(c=>!c.ok).flatMap(unmetRefs);
+}
+
+/* ------------------------------ state ------------------------------ */
+const M = CATALOGUE.modules;
+const PROG = CATALOGUE.progression || {streams:{}};
+let progCode = Object.keys(CATALOGUE.programmes)[0];
+const state = {};            // code -> passed | failed
+let selected = null;
+const filters = {blocked:false, unverified:false};
+// student context that is NOT derivable from passed modules (set in toolbar);
+// downstream these come from the parsed ERS record (year_of_study; the D1
+// semester counter).
+const student = {yearOfStudy:1, semestersRegistered:1};
+
+function context(){
+  const passed = new Set(), byLevel = {};
+  let credits = 0;
+  for(const [code, st] of Object.entries(state)){
+    if(st !== "passed") continue;
+    passed.add(code);
+    const m = M[code]; if(!m) continue;
+    credits += m.credits;
+    byLevel[m.level] = (byLevel[m.level] || 0) + m.credits;
+  }
+  return {passed, byLevel, credits, registered:new Set(),
+          yearOfStudy:student.yearOfStudy, semestersRegistered:student.semestersRegistered};
+}
+
+/* MUST / MAY / BLOCKED — provisional until rules/eligibility.py lands.
+   done    already passed
+   blocked prerequisites unmet
+   must    prerequisites met and the module was failed before (a repeat)
+   may     prerequisites met, not yet attempted                        */
+function eligibility(code, ctx){
+  if(state[code] === "passed") return {verdict:"done", out:{ok:true, reason:"passed", children:[]}};
+  const out = evaluate(M[code].prerequisites, ctx);
+  if(!out.ok) return {verdict:"blocked", out};
+  return {verdict: state[code] === "failed" ? "must" : "may", out};
+}
+
+/* --------------------------- rendering ---------------------------- */
+const sheet = document.getElementById("sheet");
+
+function render(){
+  const prog = CATALOGUE.programmes[progCode];
+  const ctx = context();
+  document.getElementById("hb").textContent = CATALOGUE.handbookYear;
+  document.getElementById("progName").textContent = prog.name;
+
+  sheet.innerHTML = "";
+  let must=0, may=0, blocked=0;
+
+  const stream = prog.stream || "mainstream";
+  const thresholds = (PROG.streams && PROG.streams[stream]) || {};
+  let cumPassed = 0;
+
+  for(const sem of prog.semesters){
+    const band = document.createElement("section");
+    band.className = "sem";
+    const earned = sem.modules.reduce((a,c)=> a + (state[c]==="passed" ? M[c].credits : 0), 0);
+    const total  = sem.modules.reduce((a,c)=> a + M[c].credits, 0);
+    cumPassed += earned;
+
+    // cumulative min-progression line for this semester (progression.yaml)
+    const semIx = sem.year === 0 ? null : (sem.year - 1) * 2 + sem.block;
+    const row = semIx != null ? thresholds[String(semIx)] : null;
+    const minProg = row ? row[0] : null;
+    let progNote = "";
+    if(minProg != null){
+      const met = cumPassed >= minProg;
+      progNote = `<span class="prog ${met ? "met" : "short"}"
+        title="Cumulative min progression at semester ${semIx} (progression.yaml)">
+        ${cumPassed} / min ${minProg} cr</span>`;
+    }
+
+    band.innerHTML =
+      `<div class="sem-head">
+         <span class="yr">${sem.year === 0 ? "Augmented year" : "Year " + sem.year} · Semester ${sem.block}</span>
+         <span class="cr">${earned} / ${total} cr</span>
+         <span class="gauge"><i style="width:${total ? (earned/total*100) : 0}%"></i></span>
+         ${progNote}
+       </div>`;
+    const grid = document.createElement("div");
+    grid.className = "grid";
+
+    for(const code of sem.modules){
+      const m = M[code];
+      const {verdict} = eligibility(code, ctx);
+      if(verdict === "must") must++; else if(verdict === "may") may++; else if(verdict === "blocked") blocked++;
+
+      const b = document.createElement("button");
+      b.className = "cell";
+      b.dataset.code = code;
+      b.dataset.state = state[code] || "none";
+      b.dataset.elig = verdict;
+      b.dataset.kind = m.kind;
+      b.dataset.prereq = m.prereqStatus;
+      if(code === selected) b.classList.add("selected");
+      const hidden = (filters.blocked && verdict !== "blocked") ||
+                     (filters.unverified && (m.prereqStatus === "handbook" || m.prereqStatus === "none"));
+      if(hidden) b.classList.add("dim");
+      b.innerHTML =
+        `<span class="flag"></span>
+         <div class="code">${code}</div>
+         <div class="sub"><span>${m.credits}cr</span><span>L${m.level}</span>
+           <span>${m.kind === "dp" ? "DP" : verdict.toUpperCase()}</span></div>`;
+      b.title = m.name + " — click to cycle: not attempted → passed → failed";
+      b.addEventListener("click", e => {
+        if(e.shiftKey){ select(code); return; }
+        state[code] = state[code] === "passed" ? "failed" : state[code] === "failed" ? undefined : "passed";
+        if(state[code] === undefined) delete state[code];
+        select(code);
+      });
+      grid.appendChild(b);
+    }
+    band.appendChild(grid);
+    sheet.appendChild(band);
+  }
+
+  document.getElementById("sCred").textContent = ctx.credits;
+  document.getElementById("sMust").textContent = must;
+  document.getElementById("sMay").textContent = may;
+  document.getElementById("sBlocked").textContent = blocked;
+
+  renderInspector(ctx);
+  drawLeaders();
+}
+
+function treeHTML(out){
+  const cls = out.ok ? "met" : "unmet";
+  if(!out.children.length) return `<li><span class="${cls}">${out.reason}</span></li>`;
+  const op = (out.op || "").replace("_", " ");
+  return `<li><span class="op">${op}</span> <span class="${cls}"></span>
+    <ul>${out.children.map(treeHTML).join("")}</ul></li>`;
+}
+
+function renderInspector(ctx){
+  const el = document.getElementById("inspector");
+  if(!selected){
+    el.innerHTML = `<h2>Inspector</h2>
+      <p class="empty">Click a module to mark it passed, click again for failed, once more to clear.
+      Shift-click inspects without changing anything.</p>
+      <hr>
+      <h2>Rule audit</h2>
+      <p class="empty">${CATALOGUE.unverified.length} of ${Object.keys(M).length} modules still need a
+      handbook check. Corner marks: <b style="color:var(--must-bar)">orange</b> inferred,
+      <b style="color:var(--fail-ink)">red</b> no rule written.</p>`;
+    return;
+  }
+  const m = M[selected];
+  const {verdict, out} = eligibility(selected, ctx);
+  const reasons = unmet(out);
+  const dependents = Object.entries(M)
+    .filter(([, mm]) => JSON.stringify(mm.prerequisites || "").includes(`"${selected}"`))
+    .map(([c]) => c);
+
+  const copy = {
+    done:    ["Passed", "Credits already earned for this slot."],
+    must:    ["Must repeat", "Failed previously and the prerequisites are met."],
+    may:     ["May register", "Prerequisites are met."],
+    blocked: ["Blocked", "These requirements are not met yet:"]
+  }[verdict];
+
+  el.innerHTML = `
+    <h2>Inspector</h2>
+    <div class="insp-code">${selected}</div>
+    <div class="insp-name">${m.name}</div>
+    <dl class="facts">
+      <dt>Credits</dt><dd>${m.credits}</dd>
+      <dt>Level</dt><dd>${m.level}</dd>
+      <dt>Block</dt><dd>${m.offered.join(", ")}</dd>
+      <dt>Kind</dt><dd>${m.kind}</dd>
+      <dt>Rule</dt><dd>${m.prereqStatus}</dd>
+      ${m.substitutes.length ? `<dt>Filled by</dt><dd>${m.substitutes.join(", ")}</dd>` : ""}
+    </dl>
+    <div class="verdict ${verdict}">
+      <b>${copy[0]}</b>${copy[1]}
+      ${reasons.length ? `<ul>${reasons.map(r=>`<li>${r}</li>`).join("")}</ul>` : ""}
+    </div>
+    <h2>Prerequisite expression</h2>
+    ${m.prerequisites
+      ? `<div class="tree"><ul>${treeHTML(out)}</ul></div>`
+      : `<p class="empty">None recorded${m.prereqStatus === "unverified" ? " — not yet checked." : "."}</p>`}
+    <hr>
+    <h2>Opens up</h2>
+    ${dependents.length
+      ? `<div class="deps">${dependents.map(c=>`<a data-goto="${c}">${c}</a>`).join(" ")}</div>`
+      : `<p class="empty">Nothing depends on this module.</p>`}`;
+
+  el.querySelectorAll("[data-goto]").forEach(a =>
+    a.addEventListener("click", () => select(a.dataset.goto)));
+}
+
+/* leader lines from a blocked module back to the modules blocking it */
+function drawLeaders(){
+  const svg = document.getElementById("leaders");
+  svg.innerHTML = "";
+  document.querySelectorAll(".cell.culprit").forEach(c => c.classList.remove("culprit"));
+  if(!selected) return;
+  const ctx = context();
+  const {verdict, out} = eligibility(selected, ctx);
+  if(verdict !== "blocked") return;
+
+  const wrap = document.querySelector(".sheet-wrap").getBoundingClientRect();
+  const from = document.querySelector(`.cell[data-code="${selected}"]`);
+  if(!from) return;
+  const f = from.getBoundingClientRect();
+  const x1 = f.left - wrap.left + f.width/2, y1 = f.top - wrap.top;
+
+  for(const ref of new Set(unmetRefs(out))){
+    const to = document.querySelector(`.cell[data-code="${ref}"]`);
+    if(!to) continue;
+    to.classList.add("culprit");
+    const t = to.getBoundingClientRect();
+    const x2 = t.left - wrap.left + t.width/2, y2 = t.top - wrap.top + t.height;
+    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d", `M${x1},${y1} C${x1},${y1-40} ${x2},${y2+40} ${x2},${y2}`);
+    path.setAttribute("fill","none");
+    path.setAttribute("stroke","var(--must-bar)");
+    path.setAttribute("stroke-width","1.25");
+    path.setAttribute("stroke-dasharray","4 3");
+    svg.appendChild(path);
+  }
+}
+
+function select(code){
+  selected = code;
+  render();
+  const cell = document.querySelector(`.cell[data-code="${code}"]`);
+  if(cell && document.activeElement !== document.body) cell.focus();
+}
+
+/* --------------------------- controls ----------------------------- */
+const progSel = document.getElementById("progSel");
+for(const [code, p] of Object.entries(CATALOGUE.programmes)){
+  const o = document.createElement("option");
+  o.value = code; o.textContent = p.name;
+  progSel.appendChild(o);
+}
+progSel.value = progCode;
+progSel.addEventListener("change", () => { progCode = progSel.value; selected = null; render(); });
+
+const yosSel = document.getElementById("yosSel");
+for(let y=1; y<=4; y++){ const o=document.createElement("option"); o.value=y; o.textContent="Y"+y; yosSel.appendChild(o); }
+const semSel = document.getElementById("semSel");
+for(let s=0; s<=14; s++){ const o=document.createElement("option"); o.value=s; o.textContent=s; semSel.appendChild(o); }
+function syncStudentSelects(){ yosSel.value = student.yearOfStudy; semSel.value = student.semestersRegistered; }
+yosSel.addEventListener("change", () => { student.yearOfStudy = +yosSel.value; render(); });
+semSel.addEventListener("change", () => { student.semestersRegistered = +semSel.value; render(); });
+syncStudentSelects();
+
+function toggle(id, key){
+  const b = document.getElementById(id);
+  b.addEventListener("click", () => {
+    filters[key] = !filters[key];
+    b.setAttribute("aria-pressed", String(filters[key]));
+    render();
+  });
+}
+toggle("fBlocked","blocked");
+toggle("fUnver","unverified");
+
+function passThrough(maxYear){
+  for(const k of Object.keys(state)) delete state[k];
+  for(const sem of CATALOGUE.programmes[progCode].semesters){
+    if(sem.year > maxYear) continue;
+    for(const c of sem.modules) if(M[c].kind !== "dp") state[c] = "passed";
+  }
+  // a student who has cleared year N is entering year N+1 with 2N semesters done
+  student.yearOfStudy = Math.min(4, maxYear + 1);
+  student.semestersRegistered = maxYear * 2;
+  syncStudentSelects();
+  render();
+}
+document.getElementById("passY1").addEventListener("click", () => passThrough(1));
+document.getElementById("passY2").addEventListener("click", () => passThrough(2));
+document.getElementById("clear").addEventListener("click", () => {
+  for(const k of Object.keys(state)) delete state[k];
+  selected = null; render();
+});
+
+/* ------------------------- parity self-check ----------------------- */
+(function parity(){
+  let pass = 0;
+  for(const c of PARITY){
+    const ctx = {
+      passed:new Set(c.passed), registered:new Set(),
+      credits:c.credits,
+      byLevel:Object.fromEntries(Object.entries(c.creditsByLevel).map(([k,v])=>[Number(k),v])),
+      yearOfStudy:c.yearOfStudy, semestersRegistered:c.semestersRegistered
+    };
+    const out = evaluate(M[c.module].prerequisites, ctx);
+    if(out.ok === c.ok && JSON.stringify(unmet(out).sort()) === JSON.stringify([...c.unmet].sort())) pass++;
+  }
+  const ok = pass === PARITY.length;
+  document.getElementById("sParity").textContent = `${pass}/${PARITY.length}`;
+  document.getElementById("pDot").className = "dot " + (ok ? "ok" : "bad");
+  document.getElementById("pDot").title = ok
+    ? "This page agrees with the Python evaluator."
+    : "This page disagrees with the Python evaluator — rebuild or fix the mirror.";
+})();
+
+window.addEventListener("resize", drawLeaders);
+render();
+</script>
+</body>
+</html>
