@@ -126,6 +126,9 @@ main{
 .cell[data-elig="blocked"] .code{color:var(--ink2)}
 .cell[data-elig="must"]{box-shadow:inset 3px 0 0 var(--must-bar)}
 .cell[data-kind="dp"]{border-style:dashed}
+.cell[data-kind="elective"]{border-style:dotted}
+.cell[data-kind="elective"] .code{color:var(--blue)}
+.cell[data-choice]{border-color:var(--blue)}
 .cell.dim{opacity:.28}
 .cell.selected{border-color:var(--blue); box-shadow:0 0 0 2px var(--blue-soft)}
 .cell.culprit{border-color:var(--must-bar); box-shadow:0 0 0 2px #F0DCC6}
@@ -195,6 +198,31 @@ footer .v{font-weight:600}
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
 .ok{background:var(--pass-ink)} .bad{background:var(--fail-ink)}
 
+/* ---------- legend + scope note ---------- */
+.keybar{
+  display:flex; gap:14px 18px; align-items:center; flex-wrap:wrap;
+  padding:8px 22px; border-bottom:1px solid var(--rule);
+  font-family:var(--mono); font-size:10.5px; color:var(--ink2);
+}
+.keybar .kk{display:flex; gap:5px; align-items:center; letter-spacing:.03em}
+.keybar .sw{width:12px; height:12px; border:1px solid var(--rule-hard);
+  border-radius:2px; display:inline-block; flex:none}
+.keybar .sw.done{background:var(--pass-fill); border-color:var(--pass-ink)}
+.keybar .sw.failed{background:var(--fail-fill); border-color:var(--fail-ink)}
+.keybar .sw.must{box-shadow:inset 3px 0 0 var(--must-bar)}
+.keybar .sw.blocked{background:var(--block-fill);
+  background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.06) 3px 4px)}
+.keybar .sw.dp{border-style:dashed}
+.keybar .note{font-style:italic; color:var(--ink3)}
+
+/* ---------- inspector state controls ---------- */
+.stateset{display:flex; gap:6px; margin:0 0 12px}
+.sbtn{border:1px solid var(--rule-hard); background:transparent; border-radius:2px;
+  padding:5px 10px; font-family:var(--mono); font-size:11px;
+  letter-spacing:.06em; text-transform:uppercase}
+.sbtn:hover{background:var(--band)}
+.sbtn[aria-pressed="true"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+
 @media (max-width:900px){
   main{grid-template-columns:1fr}
   aside{position:static;height:auto;border-left:0;border-top:1px solid var(--rule)}
@@ -226,9 +254,22 @@ footer .v{font-weight:600}
   <select class="chip" id="semSel"></select>
   <span class="spacer"></span>
   <span class="label">Scenario</span>
-  <button class="chip" id="passY1">Pass year 1</button>
-  <button class="chip" id="passY2">Pass through year 2</button>
+  <button class="chip" id="passY1" title="Demo: mark all Year 1 modules passed">Pass year 1</button>
+  <button class="chip" id="passY2" title="Demo: mark Years 1–2 passed">Pass through year 2</button>
   <button class="chip" id="clear">Clear</button>
+</div>
+
+<div class="keybar">
+  <span class="label">Key</span>
+  <span class="kk"><i class="sw done"></i>Passed</span>
+  <span class="kk"><i class="sw failed"></i>Failed</span>
+  <span class="kk"><i class="sw must"></i>Must — failed, now eligible: re-register</span>
+  <span class="kk"><i class="sw"></i>May — eligible, not yet taken</span>
+  <span class="kk"><i class="sw blocked"></i>Blocked — prerequisites unmet</span>
+  <span class="kk"><i class="sw dp"></i>DP (no credit)</span>
+  <span class="spacer"></span>
+  <span class="note">Checks prerequisites &amp; progression only — not registration
+    load limits or robot-system term decisions.</span>
 </div>
 
 <main>
@@ -248,8 +289,8 @@ footer .v{font-weight:600}
 </footer>
 
 <script>
-const CATALOGUE = {"handbookYear": 2027, "modules": {"CHEM181": {"name": "Chemistry for Engineers 1A", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH1TC": {"name": "Technical Communication for Engineers", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENCH160"]}, "ENME1DR": {"name": "Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENME160"]}, "MATH131": {"name": "Engineering Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["MATH160"]}, "MATH132": {"name": "Engineering Mathematics 1B", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS151": {"name": "Engineering Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["PHYS160"]}, "CHEM191": {"name": "Chemistry for Engineers 1B", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "CHEM181"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV1ED": {"name": "Introduction to Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENME1DR"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["ENAG160"]}, "ENME1EM": {"name": "Introduction to Engineering Materials", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENAG161"]}, "MATH141": {"name": "Engineering Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "MATH131"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["MATH161"]}, "MATH142": {"name": "Engineering Mathematics 1D", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH132"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "PHYS152": {"name": "Engineering Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "PHYS151"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["PHYS163"]}, "ENCV1EP": {"name": "Engineering Practice 1", "credits": 0, "level": 1, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2MT": {"name": "Civil Engineering Materials", "credits": 8, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENME1EM"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SA": {"name": "Structures 1", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH141"}, {"passed": "MATH142"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENSV2SE": {"name": "Surveying for Engineers", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH238": {"name": "Engineering Mathematics 2A", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ZULN101": {"name": "Zulu for Beginners", "credits": 16, "level": 1, "offered": [1], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2FL": {"name": "Fluids 1", "credits": 8, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH142"}, {"passed": "PHYS151"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV2MW": {"name": "Materials Workshop", "credits": 0, "level": 2, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2SB": {"name": "Structures 2", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SD": {"name": "Structural Design 1", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "GEOL215": {"name": "Elements of Geology for Civil Engineering", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH248": {"name": "Engineering Mathematics 2B", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3FA": {"name": "Fluids 2", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV2FL"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3G1": {"name": "Geotechnical Engineering Studies 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"credits_at_least": 144}, {"passed_at_level": {"level": 2, "credits": 32}}, {"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3ST": {"name": "Structures 3", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SA"}, {"passed": "ENCV2SB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TT": {"name": "Transport 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 3}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "STAT370": {"name": "Engineering Statistics", "credits": 8, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "MATH248"}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3CW": {"name": "Civil CADD Workshop", "credits": 0, "level": 3, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV3FB": {"name": "Fluids 3", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3G2": {"name": "Geotechnical Engineering Studies 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV3G1"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3SD": {"name": "Structural Design 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TP": {"name": "Transport 2", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3TT"}, {"passed": "GEOL215"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3MS": {"name": "Mathematical Systems", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH248"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCH4ML": {"name": "Engineering Management and Labour Relations", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}, {"credits_from": {"group": "second_year_core", "members": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"], "at_least": 96}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4GS": {"name": "Ground and Structural Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3G2"}, {"passed": "ENCV3SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4TE": {"name": "Transport and Environmental Management", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV3TT"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4WE": {"name": "Water and Environmental Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "ENCV3FA"}, {"passed": "ENCV3FB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENPD7PP": {"name": "Professional Practice", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DE": {"name": "Civil Engineering Design Project", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DS": {"name": "Dissertation", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4VW": {"name": "Practical Vacation Work", "credits": 0, "level": 4, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENPD7CL": {"name": "Management of Construction Contracts", "credits": 8, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "MATH160": {"name": "Augmented Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "MATH161": {"name": "Augmented Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS160": {"name": "Augmented Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS163": {"name": "Augmented Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH160": {"name": "Augmented Technical Communication", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENME160": {"name": "Augmented Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG160": {"name": "Augmented Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG161": {"name": "Augmented Engineering Mechanics", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}}, "programmes": {"CIVIL": {"name": "Civil Engineering (mainstream)", "stream": "mainstream", "semesters": [{"year": 1, "block": 1, "modules": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"]}, {"year": 1, "block": 2, "modules": ["CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP"]}, {"year": 2, "block": 1, "modules": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ZULN101"]}, {"year": 2, "block": 2, "modules": ["ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"]}, {"year": 3, "block": 1, "modules": ["ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370"]}, {"year": 3, "block": 2, "modules": ["ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS"]}, {"year": 4, "block": 1, "modules": ["ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}, {"year": 4, "block": 2, "modules": ["ENCV4DE", "ENCV4DS", "ENCV4VW", "ENPD7CL"]}]}}, "unverified": ["ENCV2FL", "ENCV3FB", "ENSV2SE", "GEOL215", "STAT370"], "progression": {"normalSemesterLoad": 72, "streams": {"mainstream": {"1": [48, 72, 54], "2": [96, 144, 108], "3": [144, 216, 162], "4": [192, 288, 216], "5": [240, 360, 270], "6": [288, 432, 324], "7": [336, 504, 378], "8": [384, 576, 432], "9": [432, null, null], "10": [480, null, null], "11": [528, null, null], "12": [576, null, null]}, "augmented": {"1": [0, 16, 0], "2": [32, 64, 48], "3": [56, 104, 78], "4": [96, 176, 132], "5": [144, 240, 180], "6": [192, 304, 228], "7": [240, 368, 276], "8": [288, 432, 324], "9": [336, 504, null], "10": [384, 576, null], "11": [432, null, null], "12": [480, null, null], "13": [528, null, null], "14": [576, null, null]}}}};
-const PARITY    = [{"module": "CHEM181", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 1, "semestersRegistered": 1, "ok": true, "unmet": []}, {"module": "ENCV2SA", "passed": ["MATH141"], "credits": 16, "creditsByLevel": {"1": 16}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you have not passed MATH142"]}, {"module": "MATH248", "passed": ["MATH141", "MATH238"], "credits": 32, "creditsByLevel": {"2": 16, "1": 16}, "yearOfStudy": 2, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3FA", "passed": ["ENCV2FL"], "credits": 8, "creditsByLevel": {"2": 8}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you must be in year 3 of study (currently year 2)"]}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 3, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 6, "ok": false, "unmet": ["you must be in year 4 of study (currently year 3)"]}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 4, "semestersRegistered": 6, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["MATH131", "MATH132", "PHYS151"], "credits": 48, "creditsByLevel": {"1": 48}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you need 62 credits at Level 1 and have 48"]}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 1, "ok": false, "unmet": ["you need 2 registered semesters and have 1"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": false, "unmet": ["you need 32 credits at Level 2 and have 0"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENCV2SA", "ENCV2SB", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 176, "creditsByLevel": {"1": 144, "2": 32}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV4DE", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": false, "unmet": ["36 of preceding_core still outstanding: CHEM181, ENCH1TC, ENME1DR, MATH131 \u2026"]}, {"module": "ENCV4DE", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCH4ML", "ENCV1ED", "ENCV2FL", "ENCV2MT", "ENCV2SA", "ENCV2SB", "ENCV2SD", "ENCV3FA", "ENCV3FB", "ENCV3G1", "ENCV3G2", "ENCV3MS", "ENCV3SD", "ENCV3ST", "ENCV3TP", "ENCV3TT", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENME1DR", "ENME1EM", "ENPD7PP", "ENSV2SE", "GEOL215", "MATH131", "MATH132", "MATH141", "MATH142", "MATH238", "MATH248", "PHYS151", "PHYS152", "STAT370"], "credits": 472, "creditsByLevel": {"1": 144, "2": 128, "3": 136, "4": 64}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": true, "unmet": []}];
+const CATALOGUE = {"handbookYear": 2027, "modules": {"CHEM181": {"name": "Chemistry for Engineers 1A", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH1TC": {"name": "Technical Communication for Engineers", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENCH160"]}, "ENME1DR": {"name": "Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENME160"]}, "MATH131": {"name": "Engineering Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["MATH160"]}, "MATH132": {"name": "Engineering Mathematics 1B", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS151": {"name": "Engineering Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["PHYS160"]}, "CHEM191": {"name": "Chemistry for Engineers 1B", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "CHEM181"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV1ED": {"name": "Introduction to Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENME1DR"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["ENAG160"]}, "ENME1EM": {"name": "Introduction to Engineering Materials", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": ["ENAG161"]}, "MATH141": {"name": "Engineering Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "MATH131"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["MATH161"]}, "MATH142": {"name": "Engineering Mathematics 1D", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH132"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "PHYS152": {"name": "Engineering Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": {"passed": "PHYS151"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": ["PHYS163"]}, "ENCV1EP": {"name": "Engineering Practice 1", "credits": 0, "level": 1, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2MT": {"name": "Civil Engineering Materials", "credits": 8, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENME1EM"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SA": {"name": "Structures 1", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH141"}, {"passed": "MATH142"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENSV2SE": {"name": "Surveying for Engineers", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH238": {"name": "Engineering Mathematics 2A", "credits": 16, "level": 2, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH131"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ZULN101": {"name": "Zulu for Beginners (non-Nguni speakers)", "credits": 16, "level": 1, "offered": [1], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2FL": {"name": "Fluids 1", "credits": 8, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH142"}, {"passed": "PHYS151"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV2MW": {"name": "Materials Workshop", "credits": 0, "level": 2, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV2SB": {"name": "Structures 2", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV2SD": {"name": "Structural Design 1", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV2SA"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "GEOL215": {"name": "Elements of Geology for Civil Engineering", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed_at_level": {"level": 1, "credits": 62}}, {"credits_from": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"], "at_least": 32}}, {"semesters_registered": {"at_least": 2}}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "MATH248": {"name": "Engineering Mathematics 2B", "credits": 16, "level": 2, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH141"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3FA": {"name": "Fluids 2", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV2FL"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3G1": {"name": "Geotechnical Engineering Studies 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"credits_at_least": 144}, {"passed_at_level": {"level": 2, "credits": 32}}, {"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3ST": {"name": "Structures 3", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SA"}, {"passed": "ENCV2SB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TT": {"name": "Transport 1", "credits": 16, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 3}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "STAT370": {"name": "Engineering Statistics", "credits": 8, "level": 3, "offered": [1], "kind": "degree", "prerequisites": {"passed": "MATH248"}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3CW": {"name": "Civil CADD Workshop", "credits": 0, "level": 3, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCV3FB": {"name": "Fluids 3", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "inferred", "substitutes": []}, "ENCV3G2": {"name": "Geotechnical Engineering Studies 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"passed": "ENCV3G1"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3SD": {"name": "Structural Design 2", "credits": 16, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3TP": {"name": "Transport 2", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3TT"}, {"passed": "GEOL215"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV3MS": {"name": "Mathematical Systems", "credits": 8, "level": 3, "offered": [2], "kind": "degree", "prerequisites": {"all_of": [{"passed": "MATH238"}, {"passed": "MATH248"}, {"passed": "STAT370"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCH4ML": {"name": "Engineering Management and Labour Relations", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed_all": {"group": "first_year_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]}}, {"credits_from": {"group": "second_year_core", "members": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"], "at_least": 96}}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4GS": {"name": "Ground and Structural Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV3G1"}, {"passed": "ENCV3G2"}, {"passed": "ENCV3SD"}, {"passed": "ENCV3ST"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4TE": {"name": "Transport and Environmental Management", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"passed": "ENCV3TT"}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4WE": {"name": "Water and Environmental Engineering", "credits": 16, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"all_of": [{"passed": "ENCV2FL"}, {"passed": "ENCV3FA"}, {"passed": "ENCV3FB"}]}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENPD7PP": {"name": "Professional Practice", "credits": 8, "level": 4, "offered": [1], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DE": {"name": "Civil Engineering Design Project", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4DS": {"name": "Dissertation", "credits": 24, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"passed_all": {"group": "preceding_core", "members": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ENCV4VW": {"name": "Practical Vacation Work", "credits": 0, "level": 4, "offered": [2], "kind": "dp", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENPD7CL": {"name": "Management of Construction Contracts", "credits": 8, "level": 4, "offered": [2], "kind": "degree", "prerequisites": {"year_of_study": {"at_least": 4}}, "corequisites": [], "prereqStatus": "handbook", "substitutes": []}, "ELEC2E": {"name": "Elective \u2014 16 cr (any module, any college)", "credits": 16, "level": 1, "offered": [1], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ELEC3E": {"name": "Elective \u2014 8 cr (free: any level, any college)", "credits": 8, "level": 3, "offered": [2], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ELEC4C": {"name": "Elective \u2014 8 cr (Level-4 CAES college; e.g. ENEL4EE/ENEL4EB)", "credits": 8, "level": 4, "offered": [1], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ELEC4E": {"name": "Elective \u2014 16 cr (free: any level, any college)", "credits": 16, "level": 4, "offered": [2], "kind": "elective", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "MATH160": {"name": "Augmented Mathematics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "MATH161": {"name": "Augmented Mathematics 1C", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS160": {"name": "Augmented Physics 1A", "credits": 16, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "PHYS163": {"name": "Augmented Physics 1B", "credits": 16, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENCH160": {"name": "Augmented Technical Communication", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENME160": {"name": "Augmented Engineering Drawing", "credits": 8, "level": 1, "offered": [1], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG160": {"name": "Augmented Engineering Design", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}, "ENAG161": {"name": "Augmented Engineering Mechanics", "credits": 8, "level": 1, "offered": [2], "kind": "degree", "prerequisites": null, "corequisites": [], "prereqStatus": "none", "substitutes": []}}, "programmes": {"ENCV": {"name": "BSc Eng (Civil Engineering)", "stream": "mainstream", "semesters": [{"year": 1, "block": 1, "modules": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"]}, {"year": 1, "block": 2, "modules": ["CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP"]}, {"year": 2, "block": 1, "modules": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ZULN101", "ELEC2E"]}, {"year": 2, "block": 2, "modules": ["ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"]}, {"year": 3, "block": 1, "modules": ["ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370"]}, {"year": 3, "block": 2, "modules": ["ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ELEC3E"]}, {"year": 4, "block": 1, "modules": ["ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP", "ELEC4C"]}, {"year": 4, "block": 2, "modules": ["ENCV4DE", "ENCV4DS", "ENCV4VW", "ENPD7CL", "ELEC4E"]}]}, "ENGEAP": {"name": "BSc Eng (Civil) \u2014 Augmented", "stream": "augmented", "semesters": [{"year": 0, "block": 1, "modules": ["MATH160", "PHYS160", "ENCH160", "ENME160"]}, {"year": 0, "block": 2, "modules": ["MATH161", "PHYS163", "ENAG160", "ENAG161"]}, {"year": 1, "block": 1, "modules": ["CHEM181", "MATH132"]}, {"year": 1, "block": 2, "modules": ["CHEM191", "MATH142", "ENCV1EP"]}, {"year": 2, "block": 1, "modules": ["ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ZULN101", "ELEC2E"]}, {"year": 2, "block": 2, "modules": ["ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248"]}, {"year": 3, "block": 1, "modules": ["ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370"]}, {"year": 3, "block": 2, "modules": ["ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ELEC3E"]}, {"year": 4, "block": 1, "modules": ["ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP", "ELEC4C"]}, {"year": 4, "block": 2, "modules": ["ENCV4DE", "ENCV4DS", "ENCV4VW", "ENPD7CL", "ELEC4E"]}]}}, "unverified": ["ENCV2FL", "ENCV3FB", "ENSV2SE", "GEOL215", "STAT370"], "progression": {"normalSemesterLoad": 72, "streams": {"mainstream": {"1": [48, 72, 54], "2": [96, 144, 108], "3": [144, 216, 162], "4": [192, 288, 216], "5": [240, 360, 270], "6": [288, 432, 324], "7": [336, 504, 378], "8": [384, 576, 432], "9": [432, null, null], "10": [480, null, null], "11": [528, null, null], "12": [576, null, null]}, "augmented": {"1": [0, 16, 0], "2": [32, 64, 48], "3": [56, 104, 78], "4": [96, 176, 132], "5": [144, 240, 180], "6": [192, 304, 228], "7": [240, 368, 276], "8": [288, 432, 324], "9": [336, 504, null], "10": [384, 576, null], "11": [432, null, null], "12": [480, null, null], "13": [528, null, null], "14": [576, null, null]}}}, "electives": [{"id": "elec16", "credits": 16, "scope": {"level": "any", "college": "any"}, "slots": ["ELEC2E"], "common": ["ZULN101"]}, {"id": "college_l4", "credits": 8, "scope": {"level": 4, "college": "caes"}, "slots": ["ELEC4C"], "common": ["ENEL4EE", "ENEL4EB"]}, {"id": "free24", "credits": 24, "scope": {"level": "any", "college": "any"}, "slots": ["ELEC3E", "ELEC4E"], "common": []}], "choices": [{"id": "y2s1_elective", "label": "Year 2 \u00b7 Semester 1 elective", "members": ["ZULN101", "ELEC2E"]}]};
+const PARITY    = [{"module": "CHEM181", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 1, "semestersRegistered": 1, "ok": true, "unmet": []}, {"module": "ENCV2SA", "passed": ["MATH141"], "credits": 16, "creditsByLevel": {"1": 16}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you have not passed MATH142"]}, {"module": "MATH248", "passed": ["MATH141", "MATH238"], "credits": 32, "creditsByLevel": {"1": 16, "2": 16}, "yearOfStudy": 2, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3FA", "passed": ["ENCV2FL"], "credits": 8, "creditsByLevel": {"2": 8}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you must be in year 3 of study (currently year 2)"]}, {"module": "ENCV3TT", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 3, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 6, "ok": false, "unmet": ["you must be in year 4 of study (currently year 3)"]}, {"module": "ENPD7PP", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 4, "semestersRegistered": 6, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["MATH131", "MATH132", "PHYS151"], "credits": 48, "creditsByLevel": {"1": 48}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": false, "unmet": ["you need 62 credits at Level 1 and have 48"]}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 2, "ok": true, "unmet": []}, {"module": "ENSV2SE", "passed": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], "credits": 72, "creditsByLevel": {"1": 72}, "yearOfStudy": 2, "semestersRegistered": 1, "ok": false, "unmet": ["you need 2 registered semesters and have 1"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 144, "creditsByLevel": {"1": 144}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": false, "unmet": ["you need 32 credits at Level 2 and have 0"]}, {"module": "ENCV3G1", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCV1ED", "ENCV2SA", "ENCV2SB", "ENME1DR", "ENME1EM", "MATH131", "MATH132", "MATH141", "MATH142", "PHYS151", "PHYS152"], "credits": 176, "creditsByLevel": {"1": 144, "2": 32}, "yearOfStudy": 3, "semestersRegistered": 4, "ok": true, "unmet": []}, {"module": "ENCV4DE", "passed": [], "credits": 0, "creditsByLevel": {}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": false, "unmet": ["36 of preceding_core still outstanding: CHEM181, ENCH1TC, ENME1DR, MATH131 \u2026"]}, {"module": "ENCV4DE", "passed": ["CHEM181", "CHEM191", "ENCH1TC", "ENCH4ML", "ENCV1ED", "ENCV2FL", "ENCV2MT", "ENCV2SA", "ENCV2SB", "ENCV2SD", "ENCV3FA", "ENCV3FB", "ENCV3G1", "ENCV3G2", "ENCV3MS", "ENCV3SD", "ENCV3ST", "ENCV3TP", "ENCV3TT", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENME1DR", "ENME1EM", "ENPD7PP", "ENSV2SE", "GEOL215", "MATH131", "MATH132", "MATH141", "MATH142", "MATH238", "MATH248", "PHYS151", "PHYS152", "STAT370"], "credits": 472, "creditsByLevel": {"1": 144, "2": 128, "3": 136, "4": 64}, "yearOfStudy": 4, "semestersRegistered": 8, "ok": true, "unmet": []}];
 
 /* ------------------------------------------------------------------
    Prerequisite evaluator — mirror of ce_advisory/rules/prereq.py.
@@ -351,12 +392,57 @@ const filters = {blocked:false, unverified:false};
 // semester counter).
 const student = {yearOfStudy:1, semestersRegistered:1};
 
+let studentAuto = true;   // suggest year/sem from passed modules until the user overrides
+
+function deriveStudent(){
+  const prog = CATALOGUE.programmes[progCode];
+  let lastSemIx = 0;
+  prog.semesters.forEach((sem, i) => {
+    if(sem.modules.some(c => state[c] === "passed")) lastSemIx = i + 1;
+  });
+  return {
+    yearOfStudy: Math.min(4, Math.max(1, Math.ceil((lastSemIx + 1) / 2))),
+    semestersRegistered: lastSemIx
+  };
+}
+
+/* ---- elective choice groups (mutually-exclusive slots) ---------------
+   "Pick ONE member of the group." Mirror of progression.yaml `choices`,
+   the same way the evaluator above mirrors prereq.py. Once build_explorer.py
+   injects CATALOGUE.choices this literal is used instead and can be deleted. */
+const CHOICES = CATALOGUE.choices || [
+  { id:"y2s1_elective", label:"Year 2 · Semester 1 elective", members:["ZULN101","ELEC2E"] }
+];
+const choiceOf = {};
+CHOICES.forEach(g => (g.members || []).forEach(c => { choiceOf[c] = g; }));
+
+// the member the student has committed to (passed beats failed), else null
+function activeChoice(g){
+  return g.members.find(c => state[c] === "passed")
+      || g.members.find(c => state[c] === "failed")
+      || null;
+}
+// the single member that represents the group for credit/verdict counting
+function choiceRep(g, semModules){
+  const active = activeChoice(g);
+  if(active) return active;
+  const here = g.members.filter(c => semModules.includes(c));
+  return here.reduce((a, c) => (M[c].credits > M[a].credits ? c : a), here[0]);
+}
+// true when a *different* member of this code's group is the committed one
+function shadowed(code){
+  const g = choiceOf[code]; if(!g) return false;
+  const a = activeChoice(g);
+  return a !== null && a !== code;
+}
+
 function context(){
   const passed = new Set(), byLevel = {};
   let credits = 0;
   for(const [code, st] of Object.entries(state)){
     if(st !== "passed") continue;
     passed.add(code);
+    if(shadowed(code)) continue;           // don't double-count a choice group
     const m = M[code]; if(!m) continue;
     credits += m.credits;
     byLevel[m.level] = (byLevel[m.level] || 0) + m.credits;
@@ -396,8 +482,22 @@ function render(){
   for(const sem of prog.semesters){
     const band = document.createElement("section");
     band.className = "sem";
-    const earned = sem.modules.reduce((a,c)=> a + (state[c]==="passed" ? M[c].credits : 0), 0);
-    const total  = sem.modules.reduce((a,c)=> a + M[c].credits, 0);
+    // sum credits, collapsing each choice group to one member
+    let earned = 0, total = 0;
+    const seenGroup = new Set();
+    for(const code of sem.modules){
+      const g = choiceOf[code];
+      if(g){
+        if(seenGroup.has(g.id)) continue;
+        seenGroup.add(g.id);
+        total += M[choiceRep(g, sem.modules)].credits;
+        const a = activeChoice(g);
+        if(a && state[a] === "passed") earned += M[a].credits;
+      } else {
+        total += M[code].credits;
+        if(state[code] === "passed") earned += M[code].credits;
+      }
+    }
     cumPassed += earned;
 
     // cumulative min-progression line for this semester (progression.yaml)
@@ -424,8 +524,14 @@ function render(){
 
     for(const code of sem.modules){
       const m = M[code];
+      const g = choiceOf[code];
+      const isShadow = shadowed(code);
       const {verdict} = eligibility(code, ctx);
-      if(verdict === "must") must++; else if(verdict === "may") may++; else if(verdict === "blocked") blocked++;
+      // count each choice group once (on its representative), never a shadowed slot
+      const counts = !isShadow && (!g || code === choiceRep(g, sem.modules));
+      if(counts){
+        if(verdict === "must") must++; else if(verdict === "may") may++; else if(verdict === "blocked") blocked++;
+      }
 
       const b = document.createElement("button");
       b.className = "cell";
@@ -434,20 +540,25 @@ function render(){
       b.dataset.elig = verdict;
       b.dataset.kind = m.kind;
       b.dataset.prereq = m.prereqStatus;
+      if(g) b.dataset.choice = g.id;
       if(code === selected) b.classList.add("selected");
       const hidden = (filters.blocked && verdict !== "blocked") ||
                      (filters.unverified && (m.prereqStatus === "handbook" || m.prereqStatus === "none"));
-      if(hidden) b.classList.add("dim");
+      if(hidden || isShadow) b.classList.add("dim");
+      const tag = m.kind === "dp" ? "DP" : isShadow ? "ALT" : verdict.toUpperCase();
       b.innerHTML =
         `<span class="flag"></span>
          <div class="code">${code}</div>
          <div class="sub"><span>${m.credits}cr</span><span>L${m.level}</span>
-           <span>${m.kind === "dp" ? "DP" : verdict.toUpperCase()}</span></div>`;
-      b.title = m.name + " — click to cycle: not attempted → passed → failed";
+           <span>${tag}</span></div>`;
+      b.title = g
+        ? `${m.name} — ${g.label}: choose ONE of ${g.members.join(" or ")}`
+        : m.name + " — click to cycle: not attempted → passed → failed";
       b.addEventListener("click", e => {
         if(e.shiftKey){ select(code); return; }
         state[code] = state[code] === "passed" ? "failed" : state[code] === "failed" ? undefined : "passed";
         if(state[code] === undefined) delete state[code];
+        if(studentAuto){ Object.assign(student, deriveStudent()); syncStudentSelects(); }
         select(code);
       });
       grid.appendChild(b);
@@ -494,11 +605,19 @@ function renderInspector(ctx){
     .map(([c]) => c);
 
   const copy = {
-    done:    ["Passed", "Credits already earned for this slot."],
-    must:    ["Must repeat", "Failed previously and the prerequisites are met."],
-    may:     ["May register", "Prerequisites are met."],
-    blocked: ["Blocked", "These requirements are not met yet:"]
+    done:    ["Passed", "You have credit for this module."],
+    must:    ["Must repeat", "You failed this before and now meet its prerequisites — re-register for it."],
+    may:     ["May take", "You meet the prerequisites and haven't passed it yet."],
+    blocked: ["Blocked", "You can't register yet — these prerequisites are outstanding:"]
   }[verdict];
+  const grp = choiceOf[selected];
+  const noteHTML =
+    grp ? `<div class="verdict may"><b>Choose one</b>${grp.label}: take
+             <b>${grp.members.join("</b> or <b>")}</b> — not both. Marking one done clears the other.</div>`
+    : m.kind === "elective"
+      ? `<div class="verdict may"><b>Elective</b>Take it in any semester. Any module matching this
+           bucket counts — the slot shown here is just a placeholder.</div>`
+    : "";
 
   el.innerHTML = `
     <h2>Inspector</h2>
@@ -512,10 +631,16 @@ function renderInspector(ctx){
       <dt>Rule</dt><dd>${m.prereqStatus}</dd>
       ${m.substitutes.length ? `<dt>Filled by</dt><dd>${m.substitutes.join(", ")}</dd>` : ""}
     </dl>
+    <div class="stateset" role="group" aria-label="Mark this module">
+      <button class="sbtn" data-set="passed" aria-pressed="${state[selected]==='passed'}">Passed</button>
+      <button class="sbtn" data-set="failed" aria-pressed="${state[selected]==='failed'}">Failed</button>
+      <button class="sbtn" data-set="none"   aria-pressed="${!state[selected]}">Not attempted</button>
+    </div>
     <div class="verdict ${verdict}">
       <b>${copy[0]}</b>${copy[1]}
       ${reasons.length ? `<ul>${reasons.map(r=>`<li>${r}</li>`).join("")}</ul>` : ""}
     </div>
+    ${noteHTML}
     <h2>Prerequisite expression</h2>
     ${m.prerequisites
       ? `<div class="tree"><ul>${treeHTML(out)}</ul></div>`
@@ -528,6 +653,14 @@ function renderInspector(ctx){
 
   el.querySelectorAll("[data-goto]").forEach(a =>
     a.addEventListener("click", () => select(a.dataset.goto)));
+
+  el.querySelectorAll("[data-set]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const v = btn.dataset.set;
+      if(v === "none") delete state[selected]; else state[selected] = v;
+      if(studentAuto){ Object.assign(student, deriveStudent()); syncStudentSelects(); }
+      render();
+    }));
 }
 
 /* leader lines from a blocked module back to the modules blocking it */
@@ -584,8 +717,11 @@ for(let y=1; y<=4; y++){ const o=document.createElement("option"); o.value=y; o.
 const semSel = document.getElementById("semSel");
 for(let s=0; s<=14; s++){ const o=document.createElement("option"); o.value=s; o.textContent=s; semSel.appendChild(o); }
 function syncStudentSelects(){ yosSel.value = student.yearOfStudy; semSel.value = student.semestersRegistered; }
-yosSel.addEventListener("change", () => { student.yearOfStudy = +yosSel.value; render(); });
-semSel.addEventListener("change", () => { student.semestersRegistered = +semSel.value; render(); });
+yosSel.addEventListener("change", () => { studentAuto = false; student.yearOfStudy = +yosSel.value; render(); });
+semSel.addEventListener("change", () => { studentAuto = false; student.semestersRegistered = +semSel.value; render(); });
+yosSel.title = semSel.title =
+  "Auto-filled from the modules you mark passed. In the student tool these come " +
+  "from the ERS results — you won't set them by hand. Change here to override.";
 syncStudentSelects();
 
 function toggle(id, key){
@@ -601,11 +737,18 @@ toggle("fUnver","unverified");
 
 function passThrough(maxYear){
   for(const k of Object.keys(state)) delete state[k];
+  const doneGroups = new Set();
   for(const sem of CATALOGUE.programmes[progCode].semesters){
     if(sem.year > maxYear) continue;
-    for(const c of sem.modules) if(M[c].kind !== "dp") state[c] = "passed";
+    for(const c of sem.modules){
+      if(M[c].kind === "dp") continue;
+      const g = choiceOf[c];               // fill only one member of a choice group
+      if(g){ if(doneGroups.has(g.id)) continue; doneGroups.add(g.id); }
+      state[c] = "passed";
+    }
   }
   // a student who has cleared year N is entering year N+1 with 2N semesters done
+  studentAuto = false;
   student.yearOfStudy = Math.min(4, maxYear + 1);
   student.semestersRegistered = maxYear * 2;
   syncStudentSelects();
@@ -615,6 +758,7 @@ document.getElementById("passY1").addEventListener("click", () => passThrough(1)
 document.getElementById("passY2").addEventListener("click", () => passThrough(2));
 document.getElementById("clear").addEventListener("click", () => {
   for(const k of Object.keys(state)) delete state[k];
+  studentAuto = true; Object.assign(student, deriveStudent()); syncStudentSelects();
   selected = null; render();
 });
 
