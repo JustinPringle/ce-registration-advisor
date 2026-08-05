@@ -164,7 +164,7 @@ MATH238:
       - passed: MATH141
 
 ZULN101:
-  name: Zulu for Beginners
+  name: Zulu for Beginners (non-Nguni speakers)
   credits: 16
   level: 1
   offered: [1]
@@ -415,6 +415,23 @@ ENPD7CL:
   offered: [2]
   prereq_status: handbook       # was 'unverified' — handbook gate: registered in 4th year
   prerequisites: {gate: fourth_year_only}
+
+# ------------------------------------------------- Electives (requirement slots)
+# Placeholders for the 48 cr of electives every Civil student carries. They hold
+# NO prerequisites, so the evaluator never blocks them — a student may take an
+# elective in ANY semester; the Yr/block placement in programmes.yaml is layout
+# only. The actual module a student picks is matched onto these buckets at
+# ERS-parse time. Scope, totals and the Y2S1 choice are the single source of
+# truth in progression.yaml (`electives`, `choices`).
+#   ELEC2E  16 cr  any module, any college     (Y2S1 — OR ZULN101, see choices)
+#   ELEC4C   8 cr  Level-4 CAES college module  (e.g. ENEL4EE / ENEL4EB)
+#   ELEC3E   8 cr  \ together the 24 cr free elective (any level, any college)
+#   ELEC4E  16 cr  /
+# `level` is a nominal display default; the student's real pick sets the level.
+ELEC2E: {name: "Elective — 16 cr (any module, any college)",           credits: 16, level: 1, offered: [1], kind: elective, prereq_status: none}
+ELEC3E: {name: "Elective — 8 cr (free: any level, any college)",        credits: 8,  level: 3, offered: [2], kind: elective, prereq_status: none}
+ELEC4C: {name: "Elective — 8 cr (Level-4 CAES college; e.g. ENEL4EE/ENEL4EB)", credits: 8, level: 4, offered: [1], kind: elective, prereq_status: none}
+ELEC4E: {name: "Elective — 16 cr (free: any level, any college)",       credits: 16, level: 4, offered: [2], kind: elective, prereq_status: none}
 
 # ------------------------------------------------- Augmented (substituting)
 # These carry no curriculum slot of their own; they fill a mainstream slot

@@ -64,6 +64,9 @@ class Catalogue:
     handbook_year: int
     modules: dict[str, Module] = field(default_factory=dict)
     programmes: dict[str, Programme] = field(default_factory=dict)
+    groups: dict[str, tuple] = field(default_factory=dict)
+    level_gates: dict = field(default_factory=dict)
+    progression: dict = field(default_factory=dict)
 
     def module(self, code: str) -> Module:
         try:

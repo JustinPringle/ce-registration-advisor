@@ -116,3 +116,40 @@ level_gates:
   # ENCV4DE, ENCV4DS — "Passed all preceding core modules in programme".
   final_capstone_entry:
     passed_all: preceding_core
+
+# ==========================================================================
+# ELECTIVES  (degree-completion requirements + the Y2S1 choice)
+# ==========================================================================
+# Electives are checked on AGGREGATE at graduation, not enforced by the
+# prerequisite evaluator (the placeholder slots in modules.yaml carry no
+# prerequisites, so a student may take them in any semester). A student's real
+# elective picks are matched onto these buckets at ERS-parse time by the
+# scope below — the free 24 cr bucket can hold literally any module, so it can
+# never be a `passed`/`passed_all` node. Total = 16 + 8 + 24 = 48 cr, which
+# closes the 528 cr of fixed modules to the 576 cr degree.
+#
+# scope.college:  caes = College of Agriculture, Engineering & Science only
+#                 any  = anywhere in the university
+electives:
+  - id: elec16                 # Y2S1, displayed against ZULN101 (the common pick)
+    credits: 16
+    scope: {level: any, college: any}
+    slots: [ELEC2E]
+    common: [ZULN101]
+  - id: college_l4
+    credits: 8
+    scope: {level: 4, college: caes}
+    slots: [ELEC4C]
+    common: [ENEL4EE, ENEL4EB]
+  - id: free24                 # one 24 cr requirement, laid out as 8 + 16
+    credits: 24
+    scope: {level: any, college: any}
+    slots: [ELEC3E, ELEC4E]
+    common: []
+
+# Mutually-exclusive slots: the student fills exactly ONE member of each group;
+# the others are not required and do not count toward credits.
+choices:
+  - id: y2s1_elective
+    label: "Year 2 · Semester 1 elective"
+    members: [ZULN101, ELEC2E]   # take isiZulu, OR spend the 16 cr on any module
