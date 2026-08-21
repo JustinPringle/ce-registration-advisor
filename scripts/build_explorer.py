@@ -1,155 +1,126 @@
 #!/usr/bin/env python3
-"""Generate the catalogue explorer: one standalone HTML file, no server.
+"""Build the explorer from reg_advisor's programme YAMLs — one source of truth.
 
-    python scripts/build_explorer.py catalogue/2027 explorer.html
+    python scripts/build_explorer.py [PROGRAMMES_DIR] [OUT.html]
 
-The page is built *from* the YAML, so it cannot drift from the catalogue. It
-carries no student data — only the public catalogue — and is safe to commit
-and to send to Dillip.
+Defaults: reads every ``*.yaml`` under ``programmes/`` and writes
+``explorer.html``. The page carries only the public curriculum and rules -- no
+student data -- so it is safe to commit and to send on.
 
-The page re-implements the prerequisite evaluator in JavaScript. To keep that
-mirror honest, this script runs a set of scenarios through the Python
-evaluator and embeds the expected results; the page re-runs them on load and
-reports parity in the footer. Python remains authoritative.
+reg_advisor is the source of truth. Copy its ``programmes/*.yaml`` into this
+folder whenever they change; the engine logic lives, copied once, under
+``scripts/_ra/``. This script loads each programme through reg_advisor's loader,
+embeds the curriculum and concession rules unchanged, and -- the important part
+-- computes parity cases with reg_advisor's *engine*. The page re-runs them
+through its JavaScript mirror (ra_engine.js) and reports agreement in the footer.
+If the mirror ever drifts from the engine, the footer chip goes red.
 """
-
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+RA = ROOT / "scripts" / "_ra"          # vendored reg_advisor engine (copied once)
+if not RA.exists():
+    sys.exit(f"reg_advisor engine not found at {RA}")
+sys.path.insert(0, str(RA))
 
-from ce_advisory.catalogue.loader import load_catalogue  # noqa: E402
-from ce_advisory.rules.prereq import EvalContext, evaluate  # noqa: E402
+import programme_loader as pl          # noqa: E402  (from the submodule)
+import regadvisor_engine as eng        # noqa: E402
 
 TEMPLATE = Path(__file__).with_name("explorer_template.html")
+ENGINE_JS = Path(__file__).with_name("ra_engine.js")
+
+PROFILES = [
+    {},
+    {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42,
+     "MATH132": 80, "PHYS151": 80},
+    {"ENME1DR": 48},
+    {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80,
+     "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80,
+     "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80},
+]
 
 
-def catalogue_payload(cat) -> dict:
-    modules = {
-        code: {
-            "name": m.name,
-            "credits": m.credits,
-            "level": m.level,
-            "offered": list(m.offered),
-            "kind": m.kind,
-            "prerequisites": m.prerequisites,
-            "corequisites": list(m.corequisites),
-            "prereqStatus": m.prereq_status,
-            "substitutes": list(m.substitutes),
+def programme_payload(cur: dict) -> dict:
+    prog = cur.get("programme", {})
+    rules = cur.get("rules") or {}
+    ers = (rules.get("ers") or {})
+    progression = {str(k): v for k, v in (ers.get("progression") or {}).items()}
+    modules = [
+        {
+            "code": m["code"], "name": m.get("name", m["code"]),
+            "credits": m.get("credits", 0),
+            "year": m.get("year", 0), "sem": m.get("sem", 0),
+            "prereqs": m.get("prereqs") or [],
+            "coreqs": m.get("coreqs") or [],
+            "isDp": bool(m.get("is_dp")),
+            "type": m.get("type", "prescribed"),
+            "level": eng.code_level(m["code"]),
         }
-        for code, m in cat.modules.items()
-    }
-    programmes = {
-        code: {
-            "name": p.name,
-            "stream": p.stream,
-            "semesters": [
-                {"year": s.year, "block": s.block, "modules": list(s.modules)}
-                for s in p.semesters
-            ],
-        }
-        for code, p in cat.programmes.items()
-    }
-    # progression: the template's min-progression gauge reads
-    # CATALOGUE.progression.streams[stream][sem]; electives/choices drive the
-    # elective slots and the Y2S1 pick (choices supersedes the template's
-    # hand-written CHOICES fallback once present).
-    progression = {
-        "normalSemesterLoad": cat.progression.get("normal_semester_load", 72),
-        "streams": {
-            stream: {str(sem): row for sem, row in (rows or {}).items()}
-            for stream, rows in (cat.progression.get("streams") or {}).items()
-        },
-    }
-    return {
-        "handbookYear": cat.handbook_year,
-        "modules": modules,
-        "programmes": programmes,
-        "unverified": cat.unverified_prereqs(),
-        "progression": progression,
-        "electives": cat.progression.get("electives", []),
-        "choices": cat.progression.get("choices", []),
-    }
-
-
-def parity_cases(cat) -> list[dict]:
-    """Scenarios evaluated in Python; the page must reproduce them exactly.
-
-    Covers every operator the catalogue uses, including the level-gate leaves
-    (year_of_study, semesters_registered, credits_from, passed_all,
-    passed_at_level), so the footer chip guards the whole evaluator — not just
-    the simple `passed` rules.
-    """
-    levels = {c: m.level for c, m in cat.modules.items()}
-    credits = {c: m.credits for c, m in cat.modules.items()}
-
-    FY = ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151",
-          "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152"]
-    capstone = cat.module("ENCV4DE").prerequisites["passed_all"]["members"]
-
-    # (module, passed, year_of_study, semesters_registered)
-    scenarios = [
-        ("CHEM181", [], 1, 1),
-        ("ENCV2SA", ["MATH141"], 2, 2),
-        ("MATH248", ["MATH141", "MATH238"], 2, 4),
-        ("ENCV3FA", ["ENCV2FL"], 3, 4),
-        ("ENCV3TT", [], 2, 2),
-        ("ENCV3TT", [], 3, 2),
-        ("ENPD7PP", FY, 3, 6),
-        ("ENPD7PP", FY, 4, 6),
-        ("ENSV2SE", ["MATH131", "MATH132", "PHYS151"], 2, 2),
-        ("ENSV2SE", ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], 2, 2),
-        ("ENSV2SE", ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151"], 2, 1),
-        ("ENCV3G1", FY, 3, 4),
-        ("ENCV3G1", FY + ["ENCV2SA", "ENCV2SB"], 3, 4),
-        ("ENCV4DE", [], 4, 8),
-        ("ENCV4DE", capstone, 4, 8),
+        for m in cur.get("modules", [])
     ]
+    equivalences = [[a, b] for a, b in (cur.get("equivalences") or [])]
+    return {
+        "code": prog.get("code", "PROG"),
+        "name": prog.get("name", prog.get("code", "Programme")),
+        "stream": "augmented" if "augment" in prog.get("name", "").lower() else "mainstream",
+        "passMark": 50,
+        "rules": {"concession": (rules.get("concession") or {})},
+        "progression": progression,
+        "equivalences": equivalences,
+        "modules": modules,
+    }
 
+
+def parity_for(cur: dict) -> list[dict]:
+    eq = [(a, b) for a, b in (cur.get("equivalences") or [])]
+    mods = cur.get("modules", [])
+    by_code = {m["code"]: m for m in mods}
     cases = []
-    for code, passed, yos, sems in scenarios:
-        by_level: dict[int, int] = {}
-        by_code: dict[str, int] = {}
-        for slot in passed:
-            by_level[levels[slot]] = by_level.get(levels[slot], 0) + credits[slot]
-            by_code[slot] = credits[slot]
-        ctx = EvalContext(
-            passed_slots=frozenset(passed),
-            credits_total=sum(credits[s] for s in passed),
-            credits_by_level=by_level,
-            credits_by_code=by_code,
-            year_of_study=yos,
-            semesters_registered=sems,
-        )
-        out = evaluate(cat.module(code).prerequisites, ctx)
-        cases.append({
-            "module": code,
-            "passed": sorted(passed),
-            "credits": sum(credits[s] for s in passed),
-            "creditsByLevel": {str(k): v for k, v in by_level.items()},
-            "yearOfStudy": yos,
-            "semestersRegistered": sems,
-            "ok": out.ok,
-            "unmet": out.unmet(),
-        })
+    for prof in PROFILES:
+        res = [{"course_code": k, "mark": v, "credits": by_code.get(k, {}).get("credits", 0)}
+               for k, v in prof.items()]
+        tx = eng.index_transcript(res, equivalences=eq)
+        adv = eng.eval_advice(cur, tx)
+        buckets = {}
+        for bucket in ("can_register", "concession_possible", "cannot_register",
+                       "needs_review", "passed"):
+            for m in adv[bucket]:
+                buckets[m["code"]] = bucket
+        cases.append({"marks": prof, "gpa": tx["gpa"], "buckets": buckets})
     return cases
 
 
 def main(argv: list[str]) -> int:
-    src = Path(argv[1]) if len(argv) > 1 else Path("catalogue/2027")
-    dest = Path(argv[2]) if len(argv) > 2 else Path("explorer.html")
+    src = Path(argv[1]) if len(argv) > 1 else (ROOT / "programmes")
+    dest = Path(argv[2]) if len(argv) > 2 else (ROOT / "explorer.html")
 
-    cat = load_catalogue(src)
+    yamls = sorted(src.glob("*.yaml"))
+    if not yamls:
+        sys.exit(f"no programme YAMLs under {src}")
+
+    programmes, parity = {}, {}
+    for y in yamls:
+        cur = pl.load_programme(str(y))
+        pay = programme_payload(cur)
+        programmes[pay["code"]] = pay
+        parity[pay["code"]] = parity_for(cur)
+
+    payload = {"programmes": programmes,
+               "source": "reg_advisor (submodule) — single source of truth"}
+
     html = TEMPLATE.read_text()
-    html = html.replace("/*__CATALOGUE__*/null", json.dumps(catalogue_payload(cat)))
-    html = html.replace("/*__PARITY__*/null", json.dumps(parity_cases(cat)))
+    html = html.replace("/*__RA_ENGINE__*/", ENGINE_JS.read_text())
+    html = html.replace("/*__PAYLOAD__*/null", json.dumps(payload))
+    html = html.replace("/*__PARITY__*/null", json.dumps(parity))
     dest.write_text(html)
 
-    print(f"Wrote {dest} — catalogue {cat.handbook_year}, "
-          f"{len(cat.modules)} modules, {len(parity_cases(cat))} parity cases.")
+    total = sum(len(p["modules"]) for p in programmes.values())
+    print(f"Wrote {dest} — {len(programmes)} programme(s), {total} modules, "
+          f"parity from reg_advisor engine over {len(PROFILES)} profiles each.")
     return 0
 
 
