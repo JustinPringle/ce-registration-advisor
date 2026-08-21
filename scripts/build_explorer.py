@@ -3,16 +3,17 @@
 
     python scripts/build_explorer.py [PROGRAMMES_DIR] [OUT.html]
 
-Defaults: reads every ``*.yaml`` under ``vendor/reg_advisor/programmes`` (the
-pinned submodule) and writes ``explorer.html``. The page carries only the public
-curriculum and rules -- no student data -- so it is safe to commit and to send on.
+Defaults: reads every ``*.yaml`` under ``programmes/`` and writes
+``explorer.html``. The page carries only the public curriculum and rules -- no
+student data -- so it is safe to commit and to send on.
 
-reg_advisor is authoritative. This script loads each programme through
-reg_advisor's own loader, embeds the curriculum and the concession rules
-unchanged, and -- the important part -- computes parity cases with reg_advisor's
-*engine*. The page re-runs them through its JavaScript mirror (ra_engine.js) and
-reports agreement in the footer. If the mirror ever drifts from the advisor, the
-footer chip goes red.
+reg_advisor is the source of truth. Copy its ``programmes/*.yaml`` into this
+folder whenever they change; the engine logic lives, copied once, under
+``scripts/_ra/``. This script loads each programme through reg_advisor's loader,
+embeds the curriculum and concession rules unchanged, and -- the important part
+-- computes parity cases with reg_advisor's *engine*. The page re-runs them
+through its JavaScript mirror (ra_engine.js) and reports agreement in the footer.
+If the mirror ever drifts from the engine, the footer chip goes red.
 """
 from __future__ import annotations
 
@@ -21,10 +22,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RA = ROOT / "vendor" / "reg_advisor" / "scripts"
+RA = ROOT / "scripts" / "_ra"          # vendored reg_advisor engine (copied once)
 if not RA.exists():
-    sys.exit(f"reg_advisor submodule not found at {RA}\n"
-             f"  run:  git submodule update --init")
+    sys.exit(f"reg_advisor engine not found at {RA}")
 sys.path.insert(0, str(RA))
 
 import programme_loader as pl          # noqa: E402  (from the submodule)
@@ -95,7 +95,7 @@ def parity_for(cur: dict) -> list[dict]:
 
 
 def main(argv: list[str]) -> int:
-    src = Path(argv[1]) if len(argv) > 1 else (ROOT / "vendor/reg_advisor/programmes")
+    src = Path(argv[1]) if len(argv) > 1 else (ROOT / "programmes")
     dest = Path(argv[2]) if len(argv) > 2 else (ROOT / "explorer.html")
 
     yamls = sorted(src.glob("*.yaml"))
