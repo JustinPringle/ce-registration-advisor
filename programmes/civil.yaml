@@ -185,7 +185,7 @@ modules:
     sem: 1
     prereqs:
       - {code: MATH131, min_mark: 50}
-      - {code: MATH132, min_mark: 40}
+      - {code: MATH141, min_mark: 40}
   - {code: "ZULN101_OR", name: "Basic isiZulu Language Studies (or other language)", credits: 16, year: 2, sem: 1, type: elective}
   - {code: "ELECTIVE_Y2S1", name: "Elective", credits: 16, year: 2, sem: 1, type: elective}
 
