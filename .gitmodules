@@ -1,0 +1,4 @@
+[submodule "vendor/reg_advisor"]
+	path = vendor/reg_advisor
+	url = https://github.com/JustinPringle/reg_advisor.git
+	branch = main
