@@ -58,6 +58,7 @@ def programme_payload(cur: dict) -> dict:
             "coreqs": m.get("coreqs") or [],
             "isDp": bool(m.get("is_dp")),
             "type": m.get("type", "prescribed"),
+            "choice": m.get("choice") or None,
             "level": eng.code_level(m["code"]),
         }
         for m in cur.get("modules", [])
@@ -68,7 +69,12 @@ def programme_payload(cur: dict) -> dict:
         "name": prog.get("name", prog.get("code", "Programme")),
         "stream": "augmented" if "augment" in prog.get("name", "").lower() else "mainstream",
         "passMark": 50,
-        "rules": {"concession": (rules.get("concession") or {})},
+        # concession drives the verdict; credit_cap and electives are read only by
+        # the printed advisory record, which states the load and elective rules
+        # the student's plan is measured against.
+        "rules": {"concession": (rules.get("concession") or {}),
+                  "credit_cap": (rules.get("credit_cap") or {}),
+                  "electives": (rules.get("electives") or {})},
         "progression": progression,
         "equivalences": equivalences,
         "modules": modules,
@@ -102,9 +108,15 @@ def main(argv: list[str]) -> int:
     if not yamls:
         sys.exit(f"no programme YAMLs under {src}")
 
+    # Mainstream first: the page opens on the first key, and alphabetical file
+    # order would otherwise land every student on the augmented programme.
+    loaded = [(y, pl.load_programme(str(y))) for y in yamls]
+    loaded.sort(key=lambda pair: (
+        "augment" in (pair[1].get("programme", {}).get("name", "").lower()),
+        pair[0].name))
+
     programmes, parity = {}, {}
-    for y in yamls:
-        cur = pl.load_programme(str(y))
+    for _y, cur in loaded:
         pay = programme_payload(cur)
         programmes[pay["code"]] = pay
         parity[pay["code"]] = parity_for(cur)

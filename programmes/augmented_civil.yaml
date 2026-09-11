@@ -36,6 +36,7 @@
 programme:
   code: ENG-CIVIL-AUG
   name: Civil Engineering (Augmented)
+  total_credits: 576
 regulation_years: 5
 external_prereqs:
   - PHYS110
@@ -119,7 +120,7 @@ modules:
   - {code: PHYS160, name: "Augmented Engineering Physics 1A", credits: 16, year: 1, sem: 2, year_long: true}
   - {code: ENAG161, name: "Augmented Engineering Materials", credits: 8, year: 1, sem: 2}
   - code: ENAG160
-    name: "Augmented Engineering Design"
+    name: "Augmented Engineering Design 1"
     credits: 8
     year: 1
     sem: 2
@@ -132,9 +133,18 @@ modules:
   # ---- Year 2, Semester 1 ------------------------------------------------
   - {code: MATH132, name: "Applied Mathematics 1A (Eng)", credits: 16, year: 2, sem: 1}
   - {code: CHEM181, name: "Chemistry for Engineers 1A", credits: 8, year: 2, sem: 1}
-  # Handbook: "Level 2 Programme Specific Module" (16 cr) — a pull-forward of one
-  # Level-2 module. Which one is a curriculum choice (placeholder until named).
-  - {code: "L2_SPECIFIC_Y2S1", name: "Level 2 Programme-Specific Module", credits: 16, year: 2, sem: 1, type: placeholder}
+  # Handbook: "Level 2 Programme Specific Module" (16 cr) — a pull-forward of the
+  # Level-2 Surveying module (ENSV2SE) into augmented Year 2. Named from the
+  # cohort: 96 of 153 augmented students sat ENSV2SE in this slot. Removed from
+  # Year 3 to avoid double-listing (see A1c). — Justin Pringle 2026-08-25
+  - code: ENSV2SE
+    name: "Surveying Engineering"
+    credits: 16
+    year: 2
+    sem: 1
+    prereqs:
+      - {min_credits: 62, level: 1}
+      - {min_sem: 2}
 
   # ---- Year 2, Semester 2 ------------------------------------------------
   - code: MATH161
@@ -159,7 +169,8 @@ modules:
     year: 2
     sem: 2
     prereqs:                     # mainstream: MATH131 + MATH132 carry
-      - {any: [{code: MATH160, min_mark: 40}, {code: MATH131, min_mark: 40}]}
+      - {any: [{code: MATH160, min_mark: 40}, 
+              {code: MATH131, min_mark: 40}]}
       - {code: MATH132, min_mark: 40}
   - code: CHEM191
     name: "Chemistry for Engineers 1B"
@@ -168,7 +179,11 @@ modules:
     sem: 2
     prereqs:
       - {code: CHEM181, min_mark: 40}
-  - {code: "ELECTIVE_OR_ZULN_Y2S2", name: "Elective or ZULN101 (Basic isiZulu)", credits: 16, year: 2, sem: 2, type: elective}
+  - {code: "ELECTIVE_OR_ZULN_Y2S2", name: "Basic isiZulu Language Studies (or other language)",
+     credits: 16, year: 2, sem: 2, type: elective, choice: LANG_AUG}
+  # - {code: "ELECTIVE_OR_ZULN_Y2S2", name: "Elective (in place of ZULN101)",
+  #    credits: 16, year: 2, sem: 2, type: elective, choice: LANG_AUG}
+ 
 
   # ===================================================================
   # LEVEL 2 — AUGMENTED YEAR 3  (mainstream Level 2, year hint +1)
@@ -188,22 +203,18 @@ modules:
     year: 3
     sem: 1
     prereqs: [*TW_M1B, MATH142]        # was MATH141, MATH142
-  - code: ENSV2SE
-    name: "Surveying Engineering"
-    credits: 16
-    year: 3
-    sem: 1
-    prereqs:
-      - {min_credits: 62, level: 1}
-      - {min_sem: 2}
+  # ENSV2SE (Surveying) is pulled forward to Year 2 Sem 1 (A1c) — not repeated here.
   - code: MATH238
     name: "Mathematics 2A (Eng)"
     credits: 16
     year: 3
     sem: 1
-    prereqs: [*TW_M1A, *TW_M1B]        # was MATH131, MATH141
-  - {code: "ZULN101_OR", name: "Basic isiZulu Language Studies (or other language)", credits: 16, year: 3, sem: 1, type: elective}
-  - {code: "ELECTIVE_Y2S1", name: "Elective", credits: 16, year: 3, sem: 1, type: elective}
+    prereqs: 
+      - {any: [{code: MATH160, min_mark: 50}, {code: MATH131, min_mark: 50}]}
+      - {any: [{code: MATH161, min_mark: 40}, {code: MATH141, min_mark: 40}]} #[*TW_M1A, *TW_M1B]        # was MATH131, MATH141
+  
+
+  
 
   # ---- Sem 2 -------------------------------------------------------------
   - code: ENCV2FL
@@ -442,9 +453,11 @@ modules:
 #       prereq CHECKING is unaffected — but three min_year floors were bumped +1
 #       (ENCV3TT, ENPD7PP, ENPD7CL) to stay fail-safe on the 5-year calendar.
 #
-#   A1c The Year-2 "Level 2 Programme-Specific Module" is a pull-forward of one
-#       Year-3 module. Name it, then remove it from Year 3 to avoid double-listing.
-#       Likewise confirm the Year-2 elective/ZULN is not repeated in Year 3.
+#   A1c RESOLVED: the Year-2 "Level 2 Programme-Specific Module" is ENSV2SE
+#       (Surveying), pulled forward from Year 3. Named from the cohort — 96 of
+#       153 augmented students sat ENSV2SE in this slot — and removed from
+#       Year 3 to avoid double-listing. — Justin Pringle 2026-08-25
+#       STILL OPEN: confirm the Year-2 elective/ZULN is not repeated in Year 3.
 #
 #   A2  Should the eight mainstream twins be catalogued as `substitute` modules?
 #       Prereq checks read the transcript, so {any: [aug, main]} clears a

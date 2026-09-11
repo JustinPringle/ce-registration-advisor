@@ -1,9 +1,3 @@
-# Vendored from reg_advisor (github.com/JustinPringle/reg_advisor, scripts/programme_loader.py).
-# reg_advisor is the source of truth. This is a copy of the ENGINE logic,
-# which changes rarely. If you change the engine in reg_advisor, recopy this
-# file. The programme POLICY (prereqs, concession numbers) lives in the YAMLs
-# under programmes/ — copy those whenever they change in reg_advisor.
-
 """
 programme_loader.py -- load and validate an authored programme file.
 
@@ -100,27 +94,47 @@ def load_programme(path: str, validate: bool = True,
     prog = dict(raw.get("programme") or {})
     modules: list[dict[str, Any]] = []
     total = 0.0
+    seen_groups: set[str] = set()
     for m in raw.get("modules") or []:
         mod = _normalise_module(m)
-        if mod["type"] == "prescribed" and isinstance(mod.get("credits"), (int, float)):
+        # A choice group is one slot however many ways it can be taken, so its
+        # credits count once. Without this every subtotal double-counts the slot.
+        grp = mod.get("choice")
+        counts = not (grp and grp in seen_groups)
+        if grp:
+            seen_groups.add(grp)
+        if counts and mod["type"] == "prescribed" and isinstance(mod.get("credits"), (int, float)):
             total += float(mod["credits"])
         modules.append(mod)
+
+    # for m in raw.get("modules") or []:
+    #     mod = _normalise_module(m)
+    #     if mod["type"] == "prescribed" and isinstance(mod.get("credits"), (int, float)):
+    #         total += float(mod["credits"])
+    #     modules.append(mod)
 
     prog.setdefault("code", "PROG")
     prog.setdefault("name", "")
     prog.setdefault("total_credits", total)   # a declared value wins if present
     external = [str(c).strip() for c in (raw.get("external_prereqs") or [])]
     equivalences: list[tuple[str, str]] = []
+    # Directional twin map (augmented -> mainstream), read from the labelled
+    # keys rather than tuple order, so the advisor can route a failed augmented
+    # module to the mainstream module the student actually repeats.
+    twins: dict[str, str] = {}
     for pair in (raw.get("equivalences") or []):
         if isinstance(pair, dict):
             codes = [str(v).strip() for v in pair.values() if isinstance(v, str)]
             external += codes
             if len(codes) == 2:
                 equivalences.append((codes[0], codes[1]))
+            aug, main = str(pair.get("augmented", "")).strip(), str(pair.get("mainstream", "")).strip()
+            if aug and main:
+                twins[aug] = main
     cur = {"programme": prog, "modules": modules, "elective_groups": {},
            "rules": merge_rules(raw.get("rules")),
            "external_prereqs": sorted(set(external)),
-           "equivalences": equivalences}
+           "equivalences": equivalences, "twins": twins}
     # cur = {"programme": prog, "modules": modules, "elective_groups": {},
     #        "rules": merge_rules(raw.get("rules"))}
 
@@ -152,6 +166,10 @@ def _normalise_module(m: dict[str, Any]) -> dict[str, Any]:
     # The author writes each review reason once, inside its {review: ...} term;
     # the advice engine looks for module.review_notes, so surface them here.
     mod["review_notes"] = _collect_reviews(mod["prereqs"])
+    # A choice group id, if any, normalised to a string so downstream grouping is
+    # a plain dict key. Absent for the ordinary case of a module in its own slot.
+    ch = mod.get("choice")
+    mod["choice"] = str(ch) if ch else None
     return mod
 
 
@@ -204,6 +222,28 @@ def validate_programme(cur: dict[str, Any]) -> dict[str, list[str]]:
                 warnings.append(f"{code}: {f} should be an integer")
 
     catalogue = set(codes)
+
+    # Choice groups: two or more modules occupying ONE slot, of which the student
+    # takes exactly one (mainstream ZULN101 vs a 16-credit elective). Members must
+    # agree on credits and on (year, sem), or the slot's credit value is ambiguous
+    # and every subtotal downstream is wrong.
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for code, m in codes.items():
+        g = m.get("choice")
+        if g:
+            groups.setdefault(str(g), []).append(m)
+    for g, members in groups.items():
+        if len(members) < 2:
+            warnings.append(f"choice group {g}: only one member ({members[0]['code']}) "
+                            f"— a choice of one is not a choice")
+        if len({mm.get("credits") for mm in members}) > 1:
+            errors.append(f"choice group {g}: members disagree on credits "
+                            + ", ".join(f"{mm['code']}={mm.get('credits')}" for mm in members))
+        if len({(mm.get("year"), mm.get("sem")) for mm in members}) > 1:
+            errors.append(f"choice group {g}: members sit in different semesters "
+                            + ", ".join(f"{mm['code']}=Y{mm.get('year')}S{mm.get('sem')}"
+                                        for mm in members))
+                
     allowed = {c.strip() for c in (cur.get("external_prereqs") or [])}
     known = catalogue | allowed
                     
