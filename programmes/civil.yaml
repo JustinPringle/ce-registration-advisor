@@ -1,0 +1,327 @@
+# Civil Engineering — programme definition and prerequisite rules.
+#
+# Authored directly in the engine's term grammar (regadvisor_engine.eval_term),
+# so no free-text parsing happens at runtime. yaml.safe_load returns exactly the
+# dicts and lists the engine reads.
+#
+# Term shapes (a module's `prereqs` is a list, AND-ed together):
+#   CODE                       course passed
+#   {code: X, min_mark: N}     best mark >= N carries (a 40-49 carry; no full pass)
+#   {code: X, soft: true}      recommended only — never blocks
+#   {all: [...]}               every term holds
+#   {any: [...]}               at least one holds
+#   {any_n: N, of: [...]}      at least N hold
+#   {min_year: N}              student in year N of study or later
+#   {min_sem: N}               registered for >= N semesters
+#   {min_credits: N, level: L} N passed credits (optionally at NQF level L)
+#   {review: "text"}           NEVER auto-clears — routes the module to a human
+#
+# `coreqs` are recorded for fidelity but the advice engine does not gate on them
+# (co-requisites are taken in the same semester). They document intent only.
+#
+# SEMANTIC NOTES:
+#   * "(40%)" carries. The sheet lets a 40–49% result carry into the next module.
+#     Authored as {code: X, min_mark: 40}: a mark >= 40 satisfies the prereq, no
+#     full pass required. A bare code term still requires a pass (>=50).
+#   * "(DP)" prereqs. Encoded as a plain pass requirement (stricter than "has DP")
+#     — still open for your sign-off.
+external_prereqs:
+  - PHYS110
+
+programme:
+  code: ENG-CIVIL
+  name: Civil Engineering
+  total_credits: 576
+regulation_years: 4
+# Degree credits per year of study, from the handbook. Checked by
+# catalogue_lint --credits; the loader warns if the module list drifts from it.
+#   144 x 4 = 576
+year_credits: {1: 144, 2: 144, 3: 144, 4: 144}
+# Augmented <-> mainstream first-year twins (handbook equivalence table). An
+# augmented-entry student who articulates into mainstream Civil sits these eight
+# modules under their augmented codes; each is the handbook equivalent of a
+# mainstream first-year core. Declaring the pairs here lets the engine credit a
+# twin pass toward the mainstream requirement, so completion and prerequisites
+# recognise the articulation student's first year. Same table as
+# augmented_civil.yaml, read from the other side.
+#
+# DECISION (D-TWIN, J. Pringle, 2026-08-19): augmented first-year twins count as
+# passing their mainstream core for mainstream Civil advice and completion.
+equivalences:
+  - {augmented: MATH160, mainstream: MATH131}   # Eng Mathematics 1A
+  - {augmented: MATH161, mainstream: MATH141}   # Eng Mathematics 1B
+  - {augmented: PHYS160, mainstream: PHYS151}   # Eng Physics 1A
+  - {augmented: PHYS163, mainstream: PHYS152}   # Eng Physics 1B
+  - {augmented: ENME160, mainstream: ENME1DR}   # Engineering Drawing
+  - {augmented: ENCH160, mainstream: ENCH1TC}   # Technical Communication
+  - {augmented: ENAG161, mainstream: ENME1EM}   # Engineering Materials
+  - {augmented: ENAG160, mainstream: ENCV1ED}   # Engineering Design (Civil branch)
+
+# Policy, as data. Every threshold the engines apply is authored here, so a new
+# programme is a copy of this file with different numbers -- no code change. Omit
+# any key (or the whole block) to inherit the safe defaults in
+# programme_loader.DEFAULT_RULES.
+rules:
+  concession:            # when a near-miss may be conceded (eval_advice)
+    min_gpa: 55          # credit-weighted average floor
+    max_missing: 1       # requirements still short and eligible
+    prereq_floor: 45     # must have scored ABOVE this in the failed prereq
+  autoclear:             # the routine concessions the academic pre-authorises (D4)
+    enabled: true
+    min_wam: 55
+    carry_band: [46, 49] # near-miss carry band in the exact prereq (>45)
+    single_miss_only: true
+    allowed_standings: [green, orange]   # never red / excluded
+    rule_id: CAC-v1
+  credit_cap:            # ERS standing -> term credit cap (null = no cap)
+    green: null
+    orange: 48
+    red: 32
+    exclude: 0
+    ERS-ORANGE-SEM: 56
+    ERS-RED-SECOND: 24
+  ers:
+      # Progression thresholds by semesters completed (robot_system_logic Section 3).
+      # Absolute passed-credit lines the standing engine reads; academics own every
+      # number. Row = [min_progression, normal, p75_of_normal].
+      progression:
+        1:  [48,  72,  54]
+        2:  [96,  144, 108]
+        3:  [144, 216, 162]
+        4:  [192, 288, 216]
+        5:  [240, 360, 270]
+        6:  [288, 432, 324]
+        7:  [336, 504, 378]
+        8:  [384, 576, 432]
+        9:  [432, null, null]
+        10: [480, null, null]
+        11: [528, null, null]
+        12: [576, null, null]
+  electives:              # degree elective rule (completion.py)
+    # (1) one Level-4 8-credit School-of-Engineering elective, PLUS
+    # (2) 24 further elective credits at any level, any college.
+    min_other_credits: 24
+    required:
+      - {level: 4, credits: 8, school: EN, count: 1,
+         label: "Level-4 8-credit School of Engineering elective"}
+
+modules:
+
+  # ---- Year 1, Semester 1 -------------------------------------------------
+  - {code: CHEM181, year: 1, sem: 1}
+  - {code: ENCH1TC, year: 1, sem: 1}
+  - {code: ENME1DR, year: 1, sem: 1}
+  - {code: MATH131, year: 1, sem: 1}
+  - {code: MATH132, year: 1, sem: 1}
+  - code: PHYS151
+    year: 1
+    sem: 1
+    coreqs:
+      - any: [MATH130, MATH195]   # co-req only — not gated
+
+  # ---- Year 1, Semester 2 -------------------------------------------------
+  - code: CHEM191
+    year: 1
+    sem: 2
+    prereqs:
+      - {code: CHEM181, min_mark: 40}
+  - code: ENCV1ED
+    year: 1
+    sem: 2
+    prereqs: [ENME1DR]
+  - {code: ENME1EM, year: 1, sem: 2}
+  - code: MATH141
+    year: 1
+    sem: 2
+    prereqs:
+      - {code: MATH131, min_mark: 40}
+  - code: MATH142
+    year: 1
+    sem: 2
+    prereqs:
+      - {code: MATH131, min_mark: 40}
+      - {code: MATH132, min_mark: 40}
+  - code: PHYS152
+    year: 1
+    sem: 2
+    prereqs:
+      - {code: PHYS151, min_mark: 40}
+  - {code: ENCV1EP, year: 1, sem: 2, is_dp: true}
+
+  # ---- Year 2, Semester 1 -------------------------------------------------
+  - code: ENCV2MT
+    year: 2
+    sem: 1
+    prereqs: [ENME1EM]
+  - code: ENCV2SA
+    year: 2
+    sem: 1
+    prereqs: [MATH141, MATH142]
+  - code: ENSV2SE
+    year: 2
+    sem: 1
+    # Sheet: ">= 62cr level 1, >=32cr core, >=2 sem reg". "core" credits are not
+    # tracked separately, so the 62cr-L1 + 2-semester gates stand in for it.
+    prereqs:
+      - {min_credits: 62, level: 1}
+      - {min_sem: 2}
+  - code: MATH238
+    year: 2
+    sem: 1
+    prereqs: 
+      - {code: MATH131, min_mark: 50}
+      - {code: MATH141, min_mark: 40}
+  - {code: "ZULN101_OR", name: "Basic isiZulu Language Studies (or other language)",
+     credits: 16, year: 2, sem: 1, type: elective, choice: LANG_Y2S1}
+  - {code: "ELECTIVE_Y2S1", name: "Elective (in place of ZULN101)",
+     credits: 16, year: 2, sem: 1, type: elective, choice: LANG_Y2S1}
+
+  # - {code: "ZULN101_OR", name: "Basic isiZulu Language Studies (or other language)", 
+  # credits: 16, year: 2, sem: 1, type: elective}
+  # - {code: "ELECTIVE_Y2S1", name: "Elective", credits: 16, year: 2, sem: 1, type: elective}
+
+  # ---- Year 2, Semester 2 -------------------------------------------------
+  - code: ENCV2FL
+    year: 2
+    sem: 2
+    prereqs:
+      - MATH142
+      - {any: [PHYS151, PHYS110]}
+  - code: ENCV2MW
+    year: 2
+    sem: 2
+    is_dp: true
+    prereqs: [ENCV2MT]          # sheet: ENCV2MT (DP)
+  - code: ENCV2SB
+    year: 2
+    sem: 2
+    prereqs: [ENCV2SA]
+  - code: ENCV2SD
+    year: 2
+    sem: 2
+    prereqs: [ENCV2SA]
+  - code: GEOL215
+    year: 2
+    sem: 2
+    prereqs:                    # sheet: same aggregate gate as ENSV2SE
+      - {min_credits: 62, level: 1}
+      - {min_sem: 2}
+  - code: MATH248
+    year: 2
+    sem: 2
+    prereqs: [MATH238, MATH141]
+
+  # ---- Year 3, Semester 1 -------------------------------------------------
+  - code: ENCV3FA
+    year: 3
+    sem: 1
+    prereqs: [ENCV2FL]
+  - code: ENCV3G1
+    year: 3
+    sem: 1
+    # Sheet: ">= 144cr total, >=32cr level 2, passed all 1st year". There are
+    # exactly 144 level-1 credits in the programme, so min_credits:144 level:1
+    # encodes "passed all first year" (and subsumes the 144-total gate).
+    prereqs:
+      - {min_credits: 144, level: 1}
+      - {min_credits: 32, level: 2}
+  - code: ENCV3ST
+    year: 3
+    sem: 1
+    prereqs: [ENCV2SA, ENCV2SB]
+  - code: ENCV3TT
+    year: 3
+    sem: 1
+    prereqs:
+      - {min_year: 3}           # sheet: "Must be in 3rd yr of study"
+  - code: STAT370
+    year: 3
+    sem: 1
+    prereqs: [MATH248]          # sheet: MATH248 (DP)
+
+  # ---- Year 3, Semester 2 -------------------------------------------------
+  - code: ENCV3CW
+    year: 3
+    sem: 2
+    is_dp: true
+    prereqs: [ENCV3ST, ENCV2SD] # sheet: ENCV3ST (DP); ENCV2SD
+  - code: ENCV3FB
+    year: 3
+    sem: 2
+    prereqs: [ENCV2FL, STAT370]
+  - code: ENCV3G2
+    year: 3
+    sem: 2
+    prereqs: [ENCV3G1]
+  - code: ENCV3SD
+    year: 3
+    sem: 2
+    prereqs: [ENCV2SD, ENCV3ST]
+  - code: ENCV3TP
+    year: 3
+    sem: 2
+    prereqs: [ENCV3G1, ENCV3TT, GEOL215]
+  - code: ENCV3MS
+    year: 3
+    sem: 2
+    prereqs: [MATH238, MATH248, STAT370]
+  - {code: "ELECTIVE_Y3S2", name: "Elective", credits: 8, year: 3, sem: 2, type: elective}
+
+  # ---- Year 4, Semester 1 -------------------------------------------------
+  - code: ENCH4ML
+    year: 4
+    sem: 1
+    # Sheet: "All first year modules, 96 credits of 2nd year modules".
+    prereqs:
+      - {min_credits: 144, level: 1}
+      - {min_credits: 96, level: 2}
+  - code: ENCV4GS
+    year: 4
+    sem: 1
+    prereqs: [ENCV3G1, ENCV3G2, ENCV3SD, ENCV3ST]
+  - code: ENCV4TE
+    year: 4
+    sem: 1
+    prereqs: [ENCV3TT]
+  - code: ENCV4WE
+    year: 4
+    sem: 1
+    prereqs: [ENCV2FL, ENCV3FA, ENCV3FB]
+  - code: ENPD7PP
+    year: 4
+    sem: 1
+    prereqs:
+      - {min_year: 4}           # sheet: only 4th-year registrations permitted
+  - {code: "ELECTIVE_Y4S1", name: "Elective", credits: 8, year: 4, sem: 1, type: elective}
+
+  # ---- Year 4, Semester 2 -------------------------------------------------
+  - code: ENCV4DE
+    year: 4
+    sem: 2
+    # Sheet: "Passed all preceding core modules in Program". The Loader derives
+    # this from the module list below -- every prescribed module in an earlier
+    # (year, sem) slot. Do NOT hand-list it: the hand-written version included
+    # ENCV4DE and ENCV4DS themselves, which is the cycle validation rejected.
+    prereqs:
+      - {preceding_core: true}
+  - code: ENCV4DS
+    year: 4
+    sem: 2
+    prereqs:
+      - {preceding_core: true}
+  - {code: ENCV4VW, year: 4, sem: 2, is_dp: true}
+  - code: ENPD7CL
+    year: 4
+    sem: 2
+    prereqs:
+      - {min_year: 4}           # sheet: only 4th-year registrations permitted
+  - {code: "ELECTIVE_Y4S2", name: "Elective", credits: 16, year: 4, sem: 2, type: elective}
+
+# ── Ingest scope ──────────────────────────────────────────────────────────────
+# The mainstream Civil ERS lists augmented (ENGEAP) students in the years their
+# section plan reads ENG-CV — they follow the mainstream curriculum after the
+# augmented foundation. They are owned by ENG-CIVIL-AUG, so defer them here rather
+# than claim them into mainstream. CT-ENG (college transfer) students are genuine
+# mainstream entrants and are kept. — Justin Pringle 2026-08-25
+ingest:
+  exclude_access: [ENGEAP]
