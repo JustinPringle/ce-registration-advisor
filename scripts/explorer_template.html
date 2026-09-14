@@ -633,7 +633,9 @@ function render(){
     sheet.appendChild(band);
   }
 
-  const gpa = t.gpa || 0;
+  /* passed-mark WAM, not the all-attempts mean: DECISION (Justin Pringle,
+     2026-08-26). Falls back to gpa so an older payload still renders. */
+  const gpa = t.gpa_passed != null ? t.gpa_passed : (t.gpa || 0);
   document.getElementById("sGpa").textContent = Object.keys(marks).length ? gpa.toFixed(1) : "—";
   document.getElementById("sMay").textContent = may;
   document.getElementById("sMust").textContent = must;
@@ -683,7 +685,7 @@ function renderInspector(t){
     .filter(mm => JSON.stringify(mm.prereqs||"").includes(`"${selected}"`))
     .map(mm => mm.code);
 
-  const gpaNow = Math.round(t.gpa||0);
+  const gpaNow = Math.round(t.gpa_passed != null ? t.gpa_passed : (t.gpa||0));
   const copy = {
     passed:              ["Passed", "You have credit for this module."],
     can_register:        e.repeat ? ["Repeat", "You failed this before but now meet its prerequisites — re-register."]
@@ -971,7 +973,7 @@ function buildPrintout(t){
     <div><span class="k">Semesters registered</span><span class="v">${student.semestersRegistered}</span></div>
     <div><span class="k">Credits passed</span><span class="v">${t.credits_passed||0} / ${degreeCr}</span></div>
     <div><span class="k">Weighted average</span>
-      <span class="v">${Object.keys(marks).length ? Math.round(t.gpa||0) : "—"}</span></div>
+      <span class="v">${Object.keys(marks).length ? Math.round(t.gpa_passed != null ? t.gpa_passed : (t.gpa||0)) : "—"}</span></div>
     <div><span class="k">Planned next term</span>
       <span class="v">${plan.size} mod · ${planCr} cr</span></div>
   </div>

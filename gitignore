@@ -1,0 +1,10 @@
+# Generated / editor noise — never committed.
+__pycache__/
+*.pyc
+.DS_Store
+
+# Student data never enters this repo. The explorer carries only the public
+# curriculum; marks are typed into the page and stay in the browser.
+*.pdf
+ers_*.csv
+parsed/

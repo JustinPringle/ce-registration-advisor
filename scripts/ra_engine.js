@@ -165,7 +165,11 @@ function verdictFor(mod, tx, rules){
   var v;
   if(pc.met) v = "can_register";
   else if(hasReview) v = "needs_review";
-  else if((tx.gpa || 0) >= gpaFloor && pc.n_unmet <= maxMissing && carryable) v = "concession_possible";
+  /* passed-mark WAM, not the all-attempts mean: DECISION (Justin Pringle,
+     2026-08-26) -- a failed sitting should not drag the concession gate down.
+     Mirrors regadvisor_engine's tx["gpa_passed"] fallback exactly. */
+  else if((tx.gpa_passed != null ? tx.gpa_passed : (tx.gpa || 0)) >= gpaFloor
+          && pc.n_unmet <= maxMissing && carryable) v = "concession_possible";
   else v = "cannot_register";
   return {verdict:v, pc:pc, repeat:attempted};
 }
@@ -190,6 +194,12 @@ function indexMarks(marksByCode, modByCode, passMark, equivalences, coreLen){
   var wsum = graded.reduce(function(a,b){ return a + b.mark * b.credits; }, 0);
   var wcr  = graded.reduce(function(a,b){ return a + b.credits; }, 0);
   var gpa = wcr ? wsum / wcr : 0;
+  /* credit-weighted mean over PASSED best-attempts only. Computed here, before
+     the twin aliasing below, so an equivalent pair is never weighted twice. */
+  var pGraded = graded.filter(function(b){ return b.passed; });
+  var pSum = pGraded.reduce(function(a,b){ return a + b.mark * b.credits; }, 0);
+  var pCr  = pGraded.reduce(function(a,b){ return a + b.credits; }, 0);
+  var gpa_passed = pCr ? pSum / pCr : 0;
   var passed_set = new Set(Object.keys(bestM).filter(function(k){ return bestM[k].passed; }));
   var credits_passed = 0, credits_by_level = {};
   Object.keys(bestM).forEach(function(k){
@@ -205,6 +215,7 @@ function indexMarks(marksByCode, modByCode, passMark, equivalences, coreLen){
       if(!bestM[a]) bestM[a] = Object.assign({}, bestM[b], {code:a}); }
   });
   return {best:bestM, attempts:attempts, passed_set:passed_set, gpa:gpa,
+          gpa_passed:gpa_passed,
           credits_passed:credits_passed, credits_by_level:credits_by_level,
           year_of_study:0, semesters_registered:0, core_len:coreLen};
 }
