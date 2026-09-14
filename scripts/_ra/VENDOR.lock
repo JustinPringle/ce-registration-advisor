@@ -1,0 +1,27 @@
+{
+  "branch": "backend_dev",
+  "commit": "8829e1f22b72a940335fb6580f20ee3bbe3a1ca7",
+  "files": {
+    "catalogue/modules.yaml": {
+      "from": "catalogue/modules.yaml",
+      "sha256": "4d38a5ccdb9dba74e459ce8834a1cf72a0bd3065940ec389e62025bcaa749183"
+    },
+    "programmes/augmented_civil.yaml": {
+      "from": "programmes/augmented_civil.yaml",
+      "sha256": "d373cfef9f6ffe539df3642e5ca77f155f869fc3fbd2be4ee96438cc0de49806"
+    },
+    "programmes/civil.yaml": {
+      "from": "programmes/civil.yaml",
+      "sha256": "6ed4909b1071bf2b2f267ef1494e124ed975ef052fd776c0c6e91274db408cc6"
+    },
+    "scripts/_ra/programme_loader.py": {
+      "from": "scripts/programme_loader.py",
+      "sha256": "7ef38c30e9eda9e692b0c921942252f878bac25990c20a60ecfacdccd52e5768"
+    },
+    "scripts/_ra/regadvisor_engine.py": {
+      "from": "scripts/regadvisor_engine.py",
+      "sha256": "84033c04db781fb4422f0f9b2c135db3c8f957e0bfa1b9730a3271f741f353c0"
+    }
+  },
+  "upstream": "/Users/justinpringle/Developer/reg_advisor"
+}

@@ -33,6 +33,16 @@ import regadvisor_engine as eng        # noqa: E402
 TEMPLATE = Path(__file__).with_name("explorer_template.html")
 ENGINE_JS = Path(__file__).with_name("ra_engine.js")
 
+# The module catalogue (name, credits, level per module) is generated upstream by
+# reg_advisor's scripts/build_catalogue.py from the ITS extract and vendored here
+# alongside the programme YAMLs. The path is passed to the loader EXPLICITLY:
+# the loader's own default resolves relative to itself, which under scripts/_ra/
+# points at a directory that does not exist, and a missing catalogue is a silent
+# fallback -- every module would quietly take its facts from the programme file,
+# or zero where the programme file no longer states them. Absent catalogue is a
+# build failure here, not a degraded page.
+CATALOGUE = ROOT / "catalogue" / "modules.yaml"
+
 PROFILES = [
     {},
     {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42,
@@ -41,6 +51,15 @@ PROFILES = [
     {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80,
      "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80,
      "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80},
+    # Augmented twins only. Exercises the equivalences path through the derived
+    # preceding_core gate: MATH160 must satisfy a gate written on MATH131.
+    {"MATH160": 70, "MATH161": 70, "PHYS160": 70, "PHYS163": 70,
+     "ENCH160": 70, "ENME160": 70, "ENAG160": 70, "ENAG161": 70},
+    # One mark below the pass line among otherwise strong results: separates the
+    # all-attempts mean from the passed-mark mean (gpa vs gpa_passed) at the
+    # concession gate.
+    {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30,
+     "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76},
 ]
 
 
@@ -58,6 +77,7 @@ def programme_payload(cur: dict) -> dict:
             "coreqs": m.get("coreqs") or [],
             "isDp": bool(m.get("is_dp")),
             "type": m.get("type", "prescribed"),
+            "choice": m.get("choice") or None,
             "level": eng.code_level(m["code"]),
         }
         for m in cur.get("modules", [])
@@ -68,7 +88,12 @@ def programme_payload(cur: dict) -> dict:
         "name": prog.get("name", prog.get("code", "Programme")),
         "stream": "augmented" if "augment" in prog.get("name", "").lower() else "mainstream",
         "passMark": 50,
-        "rules": {"concession": (rules.get("concession") or {})},
+        # concession drives the verdict; credit_cap and electives are read only by
+        # the printed advisory record, which states the load and elective rules
+        # the student's plan is measured against.
+        "rules": {"concession": (rules.get("concession") or {}),
+                  "credit_cap": (rules.get("credit_cap") or {}),
+                  "electives": (rules.get("electives") or {})},
         "progression": progression,
         "equivalences": equivalences,
         "modules": modules,
@@ -90,7 +115,9 @@ def parity_for(cur: dict) -> list[dict]:
                        "needs_review", "passed"):
             for m in adv[bucket]:
                 buckets[m["code"]] = bucket
-        cases.append({"marks": prof, "gpa": tx["gpa"], "buckets": buckets})
+        cases.append({"marks": prof, "gpa": tx["gpa"],
+                      "gpa_passed": tx.get("gpa_passed", tx["gpa"]),
+                      "buckets": buckets})
     return cases
 
 
@@ -101,10 +128,20 @@ def main(argv: list[str]) -> int:
     yamls = sorted(src.glob("*.yaml"))
     if not yamls:
         sys.exit(f"no programme YAMLs under {src}")
+    if not CATALOGUE.exists():
+        sys.exit(f"module catalogue not found at {CATALOGUE}\n"
+                 f"Copy it from reg_advisor (catalogue/modules.yaml) — the "
+                 f"programme YAMLs no longer carry module facts of their own.")
+
+    # Mainstream first: the page opens on the first key, and alphabetical file
+    # order would otherwise land every student on the augmented programme.
+    loaded = [(y, pl.load_programme(str(y), catalogue=str(CATALOGUE))) for y in yamls]
+    loaded.sort(key=lambda pair: (
+        "augment" in (pair[1].get("programme", {}).get("name", "").lower()),
+        pair[0].name))
 
     programmes, parity = {}, {}
-    for y in yamls:
-        cur = pl.load_programme(str(y))
+    for _y, cur in loaded:
         pay = programme_payload(cur)
         programmes[pay["code"]] = pay
         parity[pay["code"]] = parity_for(cur)
