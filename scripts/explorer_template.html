@@ -551,6 +551,13 @@ function semIndex(m){
    its credits once — offered once, and earned once if any member is passed.
    Everything that prints a subtotal reads this, so the sheet and the screen
    can't drift apart. */
+/* Credits the degree requires: every band's offered total, choice groups counted
+   once. Same basis as the printed record's degreeCr, so screen and sheet agree. */
+function degreeCredits(){
+  const t = {passed_set: new Set()};
+  return orderedSems().reduce((n, s) => n + bandCredits(s, t).offered, 0);
+}
+
 function bandCredits(sem, t){
   const mm = M();
   let earned = 0, offered = 0;
@@ -605,11 +612,17 @@ function render(){
 
     const ix = orderedSems().findIndex(s=>s.key===sem.key) + 1;
     const row = prg[String(ix)];
+    /* Two different numbers sit side by side here, and reading one as the other
+       is the obvious mistake: the band figure is credits in THIS semester, the
+       prog figure is cumulative credits against the ERS minimum PROGRESSION
+       floor. That floor is not the degree -- it tops out at 384 of the 576 a
+       Civil degree needs, in both streams. Label it explicitly. */
     let progNote = "";
     if(row){
       const minProg = row[0], met = cumPassed >= minProg;
       progNote = `<span class="prog ${met?"met":"short"}"
-        title="Cumulative min progression at semester ${ix}">${cumPassed} / min ${minProg} cr</span>`;
+        title="Cumulative passed credits against the ERS minimum progression floor at semester ${ix}. This is an exclusion floor, not the ${degreeCredits()} credits the degree requires."
+        >progression: ${cumPassed} / min ${minProg} cr</span>`;
     }
 
     band.innerHTML =
@@ -618,6 +631,11 @@ function render(){
          <span class="cr">${earned} / ${total} cr</span>
          <span class="gauge"><i style="width:${total?(earned/total*100):0}%"></i></span>
          ${progNote}
+         ${ix === orderedSems().length
+             ? `<span class="prog ${cumPassed >= degreeCredits() ? "met" : "short"}"
+                  title="Total passed credits against the credits the degree requires."
+                  >degree: ${cumPassed} / ${degreeCredits()} cr</span>`
+             : ""}
        </div>`;
     const grid = document.createElement("div");
     grid.className = "grid";
