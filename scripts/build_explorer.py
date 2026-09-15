@@ -146,7 +146,26 @@ def main(argv: list[str]) -> int:
         programmes[pay["code"]] = pay
         parity[pay["code"]] = parity_for(cur)
 
+    # Facts for every module named on a programme's approved elective list, so
+    # the page can show the student a real name and credit value for a choice
+    # that is not a curriculum slot. Only the listed codes travel -- the page
+    # carries the elective list, not the whole university catalogue.
+    cat = pl.load_catalogue(str(CATALOGUE))
+    wanted = {c for p in programmes.values()
+              for c in ((p["rules"].get("electives") or {}).get("options") or [])}
+    missing = sorted(c for c in wanted if c not in cat)
+    if missing:
+        sys.exit(f"elective options absent from the catalogue: {', '.join(missing)}\n"
+                 f"Either the code is wrong in the programme YAML or the ITS "
+                 f"extract predates it. A silent drop would hide an option from "
+                 f"every student, so this is a build failure.")
+    elective_catalogue = {
+        c: {"name": cat[c].get("name", c), "credits": cat[c].get("credits", 0),
+            "level": cat[c].get("level"), "blocks": cat[c].get("blocks") or [1, 2]}
+        for c in sorted(wanted)}
+
     payload = {"programmes": programmes,
+               "electiveCatalogue": elective_catalogue,
                "source": "reg_advisor (submodule) — single source of truth"}
 
     html = TEMPLATE.read_text()
@@ -157,6 +176,7 @@ def main(argv: list[str]) -> int:
 
     total = sum(len(p["modules"]) for p in programmes.values())
     print(f"Wrote {dest} — {len(programmes)} programme(s), {total} modules, "
+          f"{len(elective_catalogue)} elective options, "
           f"parity from reg_advisor engine over {len(PROFILES)} profiles each.")
     return 0
 
