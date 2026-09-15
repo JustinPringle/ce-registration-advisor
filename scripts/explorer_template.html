@@ -454,8 +454,45 @@ function setPick(slot, code){
   if(code) picks[slot] = code; else delete picks[slot];
   render();
 }
-function shownCode(code){ return pickOf(code) || code; }
+/* ---- the augmented rule (display) -----------------------------------------
+   Failing an augmented module does NOT mean repeating it — the augmented
+   section is not re-offered. The student is obliged to take the mainstream
+   twin. Showing "must retake ENAG160" is therefore wrong advice: the student
+   cannot register that module. Substitute the twin wherever the failed
+   augmented code would print.
+
+   Scope: DISPLAY ONLY. Prerequisite evaluation is unaffected — the engine's
+   {any: [aug, main]} terms already clear either twin, and the twin carries the
+   same credits, so no total moves. Mainstream Civil has no equivalences block,
+   so this is inert there.
+   — Justin Pringle 2026-09-15 (rule confirmed); mirrors
+     reg_advisor datasource_sqlite.reroute(). */
+function twinOf(code){
+  const hit = (prog().equivalences || []).find(pair => pair[0] === code);
+  return hit ? hit[1] : null;   // pair is [augmented, mainstream]
+}
+function retakeTwin(code){
+  const main = twinOf(code);
+  if(!main) return null;
+  const pass = passMark(), a = marks[code], b = marks[main];
+  if(a == null) return null;                              // never sat — nothing to repeat
+  if(a >= pass || (b != null && b >= pass)) return null;  // either twin passed
+  return main;
+}
+/* Name of a module that may live in the OTHER programme's list (the mainstream
+   twins are not in the augmented module list). Falls back to the bare code. */
+function anyModuleName(code){
+  for(const p of Object.values(PAYLOAD.programmes)){
+    const hit = (p.modules || []).find(m => m.code === code);
+    if(hit) return hit.name || code;
+  }
+  return code;
+}
+
+function shownCode(code){ return pickOf(code) || retakeTwin(code) || code; }
 function shownName(code, m){
+  const tw = !pickOf(code) && retakeTwin(code);
+  if(tw) return anyModuleName(tw) + " — mainstream twin, replaces " + code;
   const c = pickOf(code);
   if(!c) return m.name;
   const f = (PAYLOAD.electiveCatalogue || {})[c] || {};
@@ -948,6 +985,7 @@ function buildPrintout(t){
       const failed = mk != null && mk < pass && !m.isDp;
       const outcome = m.isDp ? (mk != null && mk >= pass ? "DP obtained" : "DP required")
         : passed ? "Passed"
+        : failed && retakeTwin(code) ? `Failed — take ${retakeTwin(code)} instead`
         : failed && e.verdict === "can_register" ? "Failed — may repeat"
         : failed && e.verdict === "cannot_register" ? "Failed — blocked"
         : m.choice ? "Choose one of this pair"
