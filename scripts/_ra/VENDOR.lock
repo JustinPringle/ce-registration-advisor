@@ -1,6 +1,6 @@
 {
   "branch": "backend_dev",
-  "commit": "8829e1f22b72a940335fb6580f20ee3bbe3a1ca7",
+  "commit": "3bb4b0cf020e5da5e5df08f2673234a043e62fa9",
   "files": {
     "catalogue/modules.yaml": {
       "from": "catalogue/modules.yaml",
@@ -8,7 +8,7 @@
     },
     "programmes/augmented_civil.yaml": {
       "from": "programmes/augmented_civil.yaml",
-      "sha256": "4b82a4515412f469aea7bb1e65a831111e77023415d01658188323b7a538dc2c"
+      "sha256": "6c0765143b3078d89e5d2c40eb0042155b3f85477b3bb5dba9e97cc4b081b244"
     },
     "programmes/civil.yaml": {
       "from": "programmes/civil.yaml",
