@@ -232,6 +232,9 @@ footer .v{font-weight:600}
 .markset input{font:inherit; font-size:13px; width:74px; padding:5px 8px;
   border:1px solid var(--rule); border-radius:8px; background:var(--card)}
 .markset .hint{color:var(--ink3); font-size:11.5px}
+.markset select{font:inherit; font-size:12.5px; max-width:230px; padding:5px 6px;
+  border:1px solid var(--line); border-radius:6px; background:#fff}
+.cell[data-picked] .code{color:var(--ink)}
 
 @media (max-width:900px){
   main{grid-template-columns:1fr}
@@ -420,6 +423,7 @@ const PARITY  = /*__PARITY__*/null;
 let progCode = Object.keys(PAYLOAD.programmes)[0];
 const marks = {};              // code -> number (0-100)
 const plan  = new Set();       // codes the student intends to register for
+const picks = {};              // elective slot code -> the module chosen for it
 const who   = {name:"", number:""};   // printed on the record; never leaves the tab
 let selected = null;
 const filters = {blocked:false};
@@ -430,6 +434,33 @@ function prog(){ return PAYLOAD.programmes[progCode]; }
 function modMap(){ const m={}; prog().modules.forEach(x=>m[x.code]=x); return m; }
 function passMark(){ return prog().passMark ?? 50; }
 function rules(){ return prog().rules || {}; }
+
+/* ---- elective picks -------------------------------------------------------
+   An elective slot is a requirement, not a module. The student fills it from
+   the programme's own approved list (rules.electives.options), narrowed to the
+   modules that actually fit the slot: the same credit value, offered in that
+   semester. Because the list is filtered on credits, a pick never moves a
+   credit total -- every downstream sum is untouched. The pick lives in the tab
+   beside the marks and is never stored or sent anywhere. */
+function electiveOptions(m){
+  if(!m || m.type !== "elective") return [];
+  const codes = (rules().electives || {}).options || [];
+  const cat = PAYLOAD.electiveCatalogue || {};
+  return codes.map(c => Object.assign({code:c}, cat[c] || {}))
+              .filter(o => o.credits === m.credits && (o.blocks || [1,2]).includes(m.sem));
+}
+function pickOf(code){ return picks[code] || null; }
+function setPick(slot, code){
+  if(code) picks[slot] = code; else delete picks[slot];
+  render();
+}
+function shownCode(code){ return pickOf(code) || code; }
+function shownName(code, m){
+  const c = pickOf(code);
+  if(!c) return m.name;
+  const f = (PAYLOAD.electiveCatalogue || {})[c] || {};
+  return (f.name || c) + " — chosen for " + code;
+}
 
 const VERDICT = {
   passed:              {elig:"done",       tag:"PASSED",     may:false},
@@ -613,16 +644,21 @@ function render(){
       if(code === selected) b.classList.add("selected");
       const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review");
       if(hidden) b.classList.add("dim");
-      const tag = m.isDp ? "DP" : e.tag;
+      const tag = m.isDp ? "DP"
+        : m.type === "elective" ? (pickOf(code) ? "CHOSEN" : "CHOOSE")
+        : e.tag;
+      if(pickOf(code)) b.dataset.picked = "1";
       const inPlan = plan.has(code);
       if(inPlan) b.dataset.planned = "1";
       b.innerHTML =
         `<span class="flag"></span>
-         <div class="code">${code}</div>
+         <div class="code">${shownCode(code)}</div>
          <div class="sub"><span>${m.credits}cr</span><span>L${m.level}</span><span>${tag}</span></div>
          <button class="plan" type="button" aria-pressed="${inPlan}"
                  title="Add to my registration plan">${inPlan ? "✓" : "+"}</button>`;
-      b.title = m.name + " — click to open, then enter your mark";
+      b.title = m.type === "elective"
+        ? (pickOf(code) ? shownName(code, m) : m.name + " — click to choose a module")
+        : m.name + " — click to open, then enter your mark";
       b.addEventListener("click", () => select(code));
       b.querySelector(".plan").addEventListener("click", ev => {
         ev.stopPropagation(); togglePlan(code);
@@ -670,6 +706,29 @@ function termHTML(term, t){
   return `<li><span class="${cls}">—</span></li>`;
 }
 
+/* The picker. One control, one list, filtered to the slot -- the student never
+   reads a rule, they read their options. An empty list is shown as such rather
+   than hidden: a slot no approved module fits is a curriculum question, and the
+   coordinator needs to hear about it. */
+function pickerHTML(m){
+  if(m.type !== "elective") return "";
+  const opts = electiveOptions(m);
+  const chosen = pickOf(selected);
+  const list = opts.map(o =>
+    `<option value="${o.code}"${o.code === chosen ? " selected" : ""}>${o.code} — ${o.name}</option>`).join("");
+  return `<div class="markset">
+      <label>Choose your elective
+        <select id="pickIn">
+          <option value="">— not chosen yet —</option>
+          ${list}
+        </select>
+      </label>
+      <span class="hint">${opts.length
+        ? `${opts.length} approved modules fit this slot (${m.credits} cr, Semester ${m.sem}).`
+        : `No module on the approved list fits this slot (${m.credits} cr, Semester ${m.sem}) — see your coordinator.`}</span>
+    </div>`;
+}
+
 function renderInspector(t){
   const el = document.getElementById("inspector");
   if(!selected){
@@ -698,14 +757,15 @@ function renderInspector(t){
 
   el.innerHTML = `
     <h2>Inspector</h2>
-    <div class="insp-code">${selected}</div>
-    <div class="insp-name">${m.name}</div>
+    <div class="insp-code">${shownCode(selected)}</div>
+    <div class="insp-name">${shownName(selected, m)}</div>
     <dl class="facts">
       <dt>Credits</dt><dd>${m.credits}</dd>
       <dt>Level</dt><dd>${m.level}</dd>
       <dt>Slot</dt><dd>${m.year===0?"Aug":"Y"+m.year}·S${m.sem}</dd>
       <dt>Type</dt><dd>${m.isDp?"DP":m.type}</dd>
     </dl>
+    ${pickerHTML(m)}
     <div class="markset">
       <label>Your mark
         <input type="number" min="0" max="100" inputmode="numeric" id="markIn"
@@ -736,6 +796,8 @@ function renderInspector(t){
     a.addEventListener("click", () => select(a.dataset.goto)));
   const planBtn = el.querySelector("#planBtn");
   if(planBtn) planBtn.addEventListener("click", () => togglePlan(selected));
+  const pickIn = el.querySelector("#pickIn");
+  if(pickIn) pickIn.addEventListener("change", () => setPick(selected, pickIn.value));
   const markIn = el.querySelector("#markIn");
   if(markIn) markIn.addEventListener("change", () => {
     setMark(selected, markIn.value);
@@ -874,8 +936,8 @@ function buildPrintout(t){
         : (OUTCOME[e.verdict] || "—");
       const suffix = plan.has(code) ? " · planned" : "";
       return `<tr class="${cls.join(" ")}">
-        <td class="c-code">${esc(code)}</td>
-        <td>${esc(m.name)}</td>
+        <td class="c-code">${esc(shownCode(code))}</td>
+        <td>${esc(shownName(code, m))}</td>
         <td class="c-cr">${crCell}</td>
         <td class="c-mk"><span class="mk${mk!=null && mk<pass ? " fail":""}">${mk ?? ""}</span></td>
         <td class="c-st">${esc(outcome)}${suffix}</td>
@@ -927,11 +989,11 @@ function buildPrintout(t){
                     : (e.pc && e.pc.missing && e.pc.missing.length)
                         ? clip("outstanding: " + e.pc.missing.join(", "))
                     : "—";
-  const planRow = x => `<tr><td class="c-code">${esc(x.code)}</td><td>${esc(x.m.name)}</td>
+  const planRow = x => `<tr><td class="c-code">${esc(shownCode(x.code))}</td><td>${esc(shownName(x.code, x.m))}</td>
       <td class="num">${x.m.credits}</td><td>${esc(OUTCOME[x.e.verdict] || "—")}${
       x.e.repeat ? " (repeat)" : ""}</td>
       <td class="why">${esc(x.e.verdict === "can_register" ? "" : why(x.e))}</td></tr>`;
-  const listRow = x => `<tr><td class="c-code">${esc(x.code)}</td><td>${esc(x.m.name)}</td>
+  const listRow = x => `<tr><td class="c-code">${esc(shownCode(x.code))}</td><td>${esc(shownName(x.code, x.m))}</td>
       <td class="num">${x.m.credits}</td><td class="num">${slot(x.sem)}</td>
       <td class="why">${esc(x.e.verdict === "can_register" ? "" : why(x.e))}</td></tr>`;
   const head = (...h) => `<thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead>`;

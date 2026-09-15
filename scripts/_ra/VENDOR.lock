@@ -8,11 +8,11 @@
     },
     "programmes/augmented_civil.yaml": {
       "from": "programmes/augmented_civil.yaml",
-      "sha256": "d373cfef9f6ffe539df3642e5ca77f155f869fc3fbd2be4ee96438cc0de49806"
+      "sha256": "4b82a4515412f469aea7bb1e65a831111e77023415d01658188323b7a538dc2c"
     },
     "programmes/civil.yaml": {
       "from": "programmes/civil.yaml",
-      "sha256": "6ed4909b1071bf2b2f267ef1494e124ed975ef052fd776c0c6e91274db408cc6"
+      "sha256": "bd81a45e38988c4094959c350d9c9e1dab99529f833444c905bc793e1a1f840d"
     },
     "scripts/_ra/programme_loader.py": {
       "from": "scripts/programme_loader.py",
