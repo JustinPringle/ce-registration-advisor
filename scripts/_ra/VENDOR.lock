@@ -12,15 +12,15 @@
     },
     "programmes/civil.yaml": {
       "from": "programmes/civil.yaml",
-      "sha256": "bd81a45e38988c4094959c350d9c9e1dab99529f833444c905bc793e1a1f840d"
+      "sha256": "9ff7092982ec31ae48d993bc23180f08bbf20761f6a102fe3287b85a9dc91c96"
     },
     "scripts/_ra/programme_loader.py": {
       "from": "scripts/programme_loader.py",
-      "sha256": "7ef38c30e9eda9e692b0c921942252f878bac25990c20a60ecfacdccd52e5768"
+      "sha256": "e57a5fc703ec9fc73572233a166d8a6bc93419aef4335375c056a426a40693e4"
     },
     "scripts/_ra/regadvisor_engine.py": {
       "from": "scripts/regadvisor_engine.py",
-      "sha256": "84033c04db781fb4422f0f9b2c135db3c8f957e0bfa1b9730a3271f741f353c0"
+      "sha256": "065009fdf94889ff9b2d90c71aa9843549844e92002ed40088471f504eb72aaa"
     }
   },
   "upstream": "/Users/justinpringle/Developer/reg_advisor"

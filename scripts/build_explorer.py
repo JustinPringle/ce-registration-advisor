@@ -91,8 +91,14 @@ def programme_payload(cur: dict) -> dict:
         # concession drives the verdict; credit_cap and electives are read only by
         # the printed advisory record, which states the load and elective rules
         # the student's plan is measured against.
+        # The finalist route is NOT shipped to the page. It is a coordinator
+        # decision and the page must not publish the rule; all the page carries
+        # is the list of codes whose blocked message refers the student on.
+        "refer": sorted((rules.get("finalist") or {}).get("applies_to") or []),
+        # credit_cap is gone: no standing is capped, and the probation minimum
+        # that replaced it is a coordinator decision (it depends on the
+        # completion route), so the page does not carry it either.
         "rules": {"concession": (rules.get("concession") or {}),
-                  "credit_cap": (rules.get("credit_cap") or {}),
                   "electives": (rules.get("electives") or {})},
         "progression": progression,
         "equivalences": equivalences,
@@ -101,6 +107,13 @@ def programme_payload(cur: dict) -> dict:
 
 
 def parity_for(cur: dict) -> list[dict]:
+    # Parity compares the page against the engine UNDER THE PAGE'S RULE SET.
+    # The finalist route is deliberately not shipped (see programme_payload),
+    # so it is dropped here too -- otherwise Python would judge the capstones
+    # by a rule the page does not have and every finalist case would read as a
+    # parity failure rather than the intended difference.
+    cur = {**cur, "rules": {k: v for k, v in (cur.get("rules") or {}).items()
+                            if k != "finalist"}}
     eq = [(a, b) for a, b in (cur.get("equivalences") or [])]
     mods = cur.get("modules", [])
     by_code = {m["code"]: m for m in mods}

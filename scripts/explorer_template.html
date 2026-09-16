@@ -799,6 +799,10 @@ function renderInspector(t){
     .filter(mm => JSON.stringify(mm.prereqs||"").includes(`"${selected}"`))
     .map(mm => mm.code);
 
+  // Final-year modules are arranged with the coordinator rather than judged
+  // by the page. The page states the outstanding items and refers the student
+  // on; it does not decide the case.
+  const isReferred = c => ((prog().refer)||[]).includes(c);
   const gpaNow = Math.round(t.gpa_passed != null ? t.gpa_passed : (t.gpa||0));
   const copy = {
     passed:              ["Passed", "You have credit for this module."],
@@ -806,7 +810,10 @@ function renderInspector(t){
                                   : ["May register", "You meet the prerequisites and haven't passed it yet."],
     concession_possible: ["Concession possible", `You are one requirement short, but you sat it and your average (${gpaNow}) clears the concession floor. You may apply for a concession — it goes to an academic for review, it is not granted automatically.`],
     needs_review:        ["Review", "This carries a handbook condition the tool can't score. See your coordinator."],
-    cannot_register:     ["Blocked", "You can't register yet — these prerequisites are outstanding:"],
+    cannot_register:     isReferred(selected)
+                           ? ["Talk to your coordinator",
+                              "Registration for this module is arranged with the Programme Coordinator. The tool shows what is still outstanding, but it does not make the final call — take your record to the coordinator before you register."]
+                           : ["Blocked", "You can't register yet — these prerequisites are outstanding:"],
     elective:            ["Elective", "Take it in any semester; any module matching this bucket counts."]
   }[e.verdict];
 
@@ -1141,6 +1148,11 @@ function buildPrintout(t){
   ${blocked.length ? section("E · Blocked — outstanding prerequisites",
     `<table>${head("Code","Module","Cr","Slot","Outstanding")}<tbody>${
       blocked.slice(0,14).map(listRow).join("")}</tbody></table>`
+     + (blocked.some(e => isReferred(e.code))
+        ? `<p class="none">Modules marked
+           ${blocked.filter(e => isReferred(e.code)).map(e => e.code).join(", ")}
+           are arranged with the Programme Coordinator. Take this record to the
+           coordinator rather than reading the line above as final.</p>` : "")
      + (blocked.length > 14
         ? `<p class="none">and ${blocked.length - 14} further modules later in the
            programme, all blocked by work not yet done.</p>` : "")) : ""}
