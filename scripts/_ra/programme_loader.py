@@ -70,10 +70,23 @@ DEFAULT_RULES: dict[str, Any] = {
         "allowed_standings": ["green", "orange"],
         "rule_id": "CAC-v1",
     },
-    "credit_cap": {          # regadvisor_engine.ers_credit_cap (status or code)
-        "green": None, "orange": 48, "red": 32, "exclude": 0,
-        "ERS-ORANGE-FIRSTSEM": 48, "ERS-ORANGE-CUMUL": 48, "ERS-ORANGE-SEM": 56,
-        "ERS-RED-FIRST": 32, "ERS-RED-SECOND": 24, "ERS-EXCLUDE": 0,
+    "finalist": {            # regadvisor_engine.finalist_route -- FIN-v1
+        "enabled": True,
+        "applies_to": [],    # capstone codes; empty list disables the route
+        "coregister_sem": 2, # outstanding modules here run with the capstones
+        "special_exam": {"applies_to_sem": 1, "band": [40, 49],
+                         "requires_attempted": True},
+        "rule_id": "FIN-v1",
+    },
+    "load": {                # regadvisor_engine.probation_load_check
+        "probation_min": 56,          # MINIMUM a probation student must register
+        "probation_statuses": ["red"],
+        "completion_reduces": True,   # degree completes -> reduced, on PC sign-off
+    },
+    "credit_cap": {          # DEPRECATED -- no standing is capped; see "load"
+        "green": None, "orange": None, "red": None, "exclude": 0,
+        "ERS-ORANGE-FIRSTSEM": None, "ERS-ORANGE-CUMUL": None, "ERS-ORANGE-SEM": None,
+        "ERS-RED-FIRST": None, "ERS-RED-SECOND": None, "ERS-EXCLUDE": 0,
     },
 }
 
@@ -204,6 +217,25 @@ def load_programme(path: str, validate: bool = True, strict: bool = True,
                 raise ValueError(msg)
             print(msg)
     return cur
+
+
+def fill_missing_credits(rows: list[dict[str, Any]],
+                         cur: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Result rows with a blank credit value filled from the programme.
+
+    The ERS prints no credit value against some modules -- the four 8-credit
+    augmented foundation modules (ENCH160, ENME160, ENAG160, ENAG161) among
+    them -- and a blank read as 0 makes a passed module worth nothing. The
+    programme's own module list (overrides applied), then the catalogue, says
+    what the module is worth. A value the ERS did print is never replaced.
+    """
+    if not cur:
+        return rows
+    worth = {**{c: f.get("credits") for c, f in (cur.get("catalogue") or {}).items()},
+             **{m["code"]: m.get("credits") for m in cur.get("modules", [])}}
+    return [r if r.get("credits") is not None
+            else {**r, "credits": worth.get(str(r.get("module_code") or ""))}
+            for r in rows]
 
 
 def _normalise_module(m: dict[str, Any],

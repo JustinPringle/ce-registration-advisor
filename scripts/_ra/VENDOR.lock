@@ -1,6 +1,6 @@
 {
   "branch": "backend_dev",
-  "commit": "3bb4b0cf020e5da5e5df08f2673234a043e62fa9",
+  "commit": "d07fa15dcf7a187dfbfcab7e32eef16eaacc282e",
   "files": {
     "catalogue/modules.yaml": {
       "from": "catalogue/modules.yaml",
@@ -8,19 +8,19 @@
     },
     "programmes/augmented_civil.yaml": {
       "from": "programmes/augmented_civil.yaml",
-      "sha256": "6c0765143b3078d89e5d2c40eb0042155b3f85477b3bb5dba9e97cc4b081b244"
+      "sha256": "9b8b6311dc3ec8e69e310fb8c4c4829b5fd71a58e6e12df61e261001f9a23422"
     },
     "programmes/civil.yaml": {
       "from": "programmes/civil.yaml",
-      "sha256": "bd81a45e38988c4094959c350d9c9e1dab99529f833444c905bc793e1a1f840d"
+      "sha256": "e4881ec86c9895b96d5868078aee98669649d33c9107c25db793c1d36b3c44de"
     },
     "scripts/_ra/programme_loader.py": {
       "from": "scripts/programme_loader.py",
-      "sha256": "7ef38c30e9eda9e692b0c921942252f878bac25990c20a60ecfacdccd52e5768"
+      "sha256": "0d54ae1e59f22cc24700c3cdd86b81eb319276ce07455b6ab5b4de573a9884c2"
     },
     "scripts/_ra/regadvisor_engine.py": {
       "from": "scripts/regadvisor_engine.py",
-      "sha256": "84033c04db781fb4422f0f9b2c135db3c8f957e0bfa1b9730a3271f741f353c0"
+      "sha256": "f8878519b9a79a522b6e060fee6a0bb63b9fb596a40a1ea6922bfbaddb5b9055"
     }
   },
   "upstream": "/Users/justinpringle/Developer/reg_advisor"
