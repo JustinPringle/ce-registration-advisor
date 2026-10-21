@@ -1,6 +1,6 @@
 {
   "branch": "backend_dev",
-  "commit": "b91a9d3dfc807d1a83711989a256ab71dd8def6f",
+  "commit": "9e47a7331dd699a02a578abd7023cc14d99dbbdc",
   "files": {
     "catalogue/modules.yaml": {
       "from": "catalogue/modules.yaml",
