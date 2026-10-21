@@ -130,6 +130,9 @@ main{
 .cell[data-elig="concession"]{background:var(--conc-fill); border-color:var(--conc-ink);
   background-image:none}
 .cell[data-elig="concession"] .code{color:var(--conc-ink)}
+.cell[data-elig="clash"]{background:var(--amber-bg); border-color:var(--must-bar);
+  background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(133,79,11,.07) 5px 6px)}
+.cell[data-elig="clash"] .code{color:var(--must-bar)}
 .cell[data-kind="dp"]{border-style:dashed}
 .cell[data-kind="elective"]{border-style:dotted}
 .cell[data-kind="elective"] .code{color:var(--blue)}
@@ -164,6 +167,7 @@ aside h2{
 .verdict.blocked{border-left-color:var(--fail-ink)}
 .verdict.done{border-left-color:var(--pass-ink)}
 .verdict.concession{border-left-color:var(--conc-ink); background:var(--conc-fill)}
+.verdict.clash{border-left-color:var(--must-bar); background:var(--amber-bg)}
 .verdict b{font-family:var(--mono); font-size:11px; letter-spacing:.12em;
   text-transform:uppercase; display:block; margin-bottom:3px}
 .verdict ul{margin:6px 0 0; padding-left:16px}
@@ -219,6 +223,7 @@ footer .v{font-weight:600}
 .keybar .sw.blocked{background:var(--block-fill);
   background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.06) 3px 4px)}
 .keybar .sw.conc{background:var(--conc-fill); border-color:var(--conc-ink)}
+.keybar .sw.clash{background:var(--amber-bg); border-color:var(--must-bar)}
 .keybar .sw.dp{border-style:dashed}
 .keybar .note{font-style:italic; color:var(--ink3)}
 
@@ -388,11 +393,12 @@ footer .v{font-weight:600}
   <span class="kk"><i class="sw"></i>May register</span>
   <span class="kk"><i class="sw conc"></i>Concession possible</span>
   <span class="kk"><i class="sw blocked"></i>Blocked — prerequisites unmet</span>
+  <span class="kk"><i class="sw clash"></i>Timetable clash — take the lower level first</span>
   <span class="kk"><i class="sw review"></i>Review — see coordinator</span>
   <span class="kk"><i class="sw dp"></i>DP (no credit)</span>
   <span class="kk"><i class="sw plan"></i>In my registration plan (tick the box on a card)</span>
   <span class="spacer"></span>
-  <span class="note">Prerequisites &amp; progression only — not load limits or term decisions.</span>
+  <span class="note">Prerequisites, progression &amp; timetable clashes — not load limits or term decisions.</span>
 </div>
 
 <main>
@@ -504,7 +510,8 @@ const VERDICT = {
   can_register:        {elig:"may",        tag:"MAY",        may:true},
   concession_possible: {elig:"concession", tag:"CONCESSION", may:false},
   needs_review:        {elig:"review",     tag:"REVIEW",     may:false},
-  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false}
+  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false},
+  timetable_clash:     {elig:"clash",      tag:"CLASH",      may:false}
 };
 
 /* build reg_advisor's transcript index from entered marks, then overlay the
@@ -622,12 +629,21 @@ function bandCredits(sem, t){
 const sheet = document.getElementById("sheet");
 const M = () => modMap();
 
+/* Every module's verdict for one transcript index, computed once. The clash
+   rule (TTC-v1) is a property of the whole set -- a module gives way only to
+   another the student may also register -- so verdicts are worked out
+   together, as reg_advisor's eval_advice does, then read one at a time. */
+const ADVICE = new WeakMap();
+function adviceFor(t){
+  if(!ADVICE.has(t)) ADVICE.set(t, RA.adviseAll(prog().modules, t, rules(), PAYLOAD.timetable));
+  return ADVICE.get(t);
+}
 function eligOf(code, t){
   const m = M()[code];
   if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective")
     return {verdict:"elective", elig:"may", tag:"ELECTIVE", pc:{missing:[],unmet:[]}, repeat:false};
-  const r = RA.verdictFor(m, t, rules());
-  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat};
+  const r = adviceFor(t)[code];
+  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat, clash:r.clash};
 }
 
 function render(){
@@ -683,7 +699,8 @@ function render(){
       if(e.verdict === "can_register" && !e.repeat) may++;
       else if(e.verdict === "can_register" && e.repeat) must++;
       else if(e.verdict === "concession_possible") conc++;
-      else if(e.verdict === "cannot_register" || e.verdict === "needs_review") blocked++;
+      else if(e.verdict === "cannot_register" || e.verdict === "needs_review"
+              || e.verdict === "timetable_clash") blocked++;
 
       const mk = marks[code];
       const st = mk == null ? "none" : (mk >= passMark() ? "passed" : "failed");
@@ -697,7 +714,8 @@ function render(){
       b.dataset.kind = m.isDp ? "dp" : (m.type === "elective" ? "elective" : "degree");
       if(m.choice) b.dataset.choice = m.choice;
       if(code === selected) b.classList.add("selected");
-      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review");
+      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review"
+                                          ||e.verdict==="timetable_clash");
       if(hidden) b.classList.add("dim");
       const tag = m.isDp ? "DP"
         : m.type === "elective" ? (pickOf(code) ? "CHOSEN" : "CHOOSE")
@@ -800,7 +818,8 @@ function renderInspector(t){
   }
   const m = M()[selected];
   const e = eligOf(selected, t);
-  const reasons = (e.pc && e.pc.unmet) ? e.pc.unmet : [];
+  const reasons = e.verdict === "timetable_clash" ? []
+                : (e.pc && e.pc.unmet) ? e.pc.unmet : [];
   const dependents = prog().modules
     .filter(mm => JSON.stringify(mm.prereqs||"").includes(`"${selected}"`))
     .map(mm => mm.code);
@@ -816,6 +835,14 @@ function renderInspector(t){
                            ? ["Talk to your coordinator",
                               "Registration for this module is arranged with the Programme Coordinator. The tool shows what is still outstanding, but it does not make the final call — take your record to the coordinator before you register."]
                            : ["Blocked", "You can't register yet — these prerequisites are outstanding:"],
+    timetable_clash:     e.clash
+                           ? ["Timetable clash",
+                              `${selected} meets at the same time as ${e.clash.with.join(", ")} `
+                              + `(block ${e.clash.block || "?"}: ${e.clash.periods.join(" ")}). `
+                              + `You meet the prerequisites for both, but the rule is to take the `
+                              + `lower-level module first: register ${e.clash.with.join(", ")} and `
+                              + `leave ${selected} for when it no longer clashes.`]
+                           : ["Timetable clash", ""],
     elective:            ["Elective", "Take it in any semester; any module matching this bucket counts."]
   }[e.verdict];
 
@@ -878,13 +905,15 @@ function drawLeaders(){
   if(!selected) return;
   const t = tx();
   const e = eligOf(selected, t);
-  if(e.verdict !== "cannot_register") return;
+  if(e.verdict !== "cannot_register" && e.verdict !== "timetable_clash") return;
   const wrap = document.querySelector(".sheet-wrap").getBoundingClientRect();
   const from = document.querySelector(`.cell[data-code="${selected}"]`);
   if(!from) return;
   const f = from.getBoundingClientRect();
   const x1 = f.left - wrap.left + f.width/2, y1 = f.top - wrap.top;
-  for(const ref of new Set((e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">")))){
+  const refs = e.verdict === "timetable_clash" ? (e.clash ? e.clash.with : [])
+    : (e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">"));
+  for(const ref of new Set(refs)){
     const to = document.querySelector(`.cell[data-code="${ref}"]`);
     if(!to) continue;
     to.classList.add("culprit");
@@ -918,6 +947,7 @@ const OUTCOME = {
   concession_possible: "Concession possible",
   needs_review:        "Review — see coordinator",
   cannot_register:     "Blocked",
+  timetable_clash:     "Timetable clash — take the lower level first",
   elective:            "Elective — choose"
 };
 
@@ -1029,6 +1059,7 @@ function buildPrintout(t){
   const planConc  = planned.filter(x => x.e.verdict === "concession_possible");
   const planStop  = planned.filter(x => x.e.verdict === "cannot_register"
                                      || x.e.verdict === "needs_review"
+                                     || x.e.verdict === "timetable_clash"
                                      || x.e.verdict === "passed");
   const planCr    = plannedCredits();
   const normal    = normalLoadNext();
@@ -1042,7 +1073,8 @@ function buildPrintout(t){
   const blocked = [];
   for(const sem of orderedSems()) for(const code of sem.modules){
     const e = eligOf(code, t);
-    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"))
+    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"
+                           || e.verdict === "timetable_clash"))
       blocked.push({code, m:mm[code], e, sem});
   }
 
@@ -1050,7 +1082,8 @@ function buildPrintout(t){
   /* Reasons come back as raw expressions. The capstone gate's reason names every
      core module, so clip anything longer than a line an adviser would read. */
   const clip = s => { s = String(s); return s.length > 110 ? s.slice(0,107) + "…" : s; };
-  const why    = e => (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
+  const why    = e => e.clash ? clip(e.clash.reason)
+                    : (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
                     : (e.pc && e.pc.missing && e.pc.missing.length)
                         ? clip("outstanding: " + e.pc.missing.join(", "))
                     : "—";
@@ -1147,7 +1180,7 @@ function buildPrintout(t){
           eligible.map(listRow).join("")}</tbody></table>`
       : `<p class="none">None.</p>`)}
 
-  ${blocked.length ? section("E · Blocked — outstanding prerequisites",
+  ${blocked.length ? section("E · Blocked — outstanding prerequisites or a timetable clash",
     `<table>${head("Code","Module","Cr","Slot","Outstanding")}<tbody>${
       blocked.slice(0,14).map(listRow).join("")}</tbody></table>`
      + (blocked.some(e => isReferred(e.code))
@@ -1169,9 +1202,10 @@ function buildPrintout(t){
     <div class="notes"><span class="lb">Adviser notes / amendments</span><div class="notebox"></div></div>
   </div>
 
-  <p class="print-note">Scope: prerequisites and cumulative progression credits only.
-    This record does not apply term decisions, ERS academic standing, credit caps or timetable
-    clashes, and it is not a registration. Final registration is subject to Faculty approval.
+  <p class="print-note">Scope: prerequisites, cumulative progression credits and timetable
+    clashes (where two modules meet at the same time, the lower level is taken first).
+    This record does not apply term decisions, ERS academic standing or credit caps, and it
+    is not a registration. Final registration is subject to Faculty approval.
     Produced by the CE registration advisory explorer · ${esc(date)}.</p>`;
 }
 
@@ -1232,12 +1266,12 @@ document.getElementById("print").addEventListener("click", () => window.print())
     const mm = {}; p.modules.forEach(x=>mm[x.code]=x);
     for(const c of cases){
       const t = RA.indexMarks(c.marks, mm, p.passMark ?? 50, p.equivalences, 7);
+      const adv = RA.adviseAll(p.modules, t, p.rules||{}, PAYLOAD.timetable);
       for(const m of p.modules){
         if(m.type==="elective"||m.type==="free_elective"||m.type==="core_elective") continue;
         total++;
-        const r = RA.verdictFor(m, t, p.rules||{});
         const want = c.buckets[m.code] || "cannot_register";
-        if(r.verdict === want) pass++;
+        if(adv[m.code].verdict === want) pass++;
       }
     }
   }

@@ -1,6 +1,7 @@
 /* ra_engine.js — a faithful mirror of reg_advisor/scripts/regadvisor_engine.py.
    reg_advisor is the single source of truth; this file re-implements eval_term,
-   check_prereqs, carry_ok, unmet_count and the four-bucket verdict exactly, so
+   check_prereqs, carry_ok, unmet_count, the four-bucket verdict and the
+   timetable clash rule (find_clashes / apply_timetable) exactly, so
    the explorer page agrees with the advisor. build_explorer.py embeds parity
    cases computed by the PYTHON engine; the page re-runs them and reports parity.
 
@@ -220,7 +221,119 @@ function indexMarks(marksByCode, modByCode, passMark, equivalences, coreLen){
           year_of_study:0, semesters_registered:0, core_len:coreLen};
 }
 
+/* ---- timetable clashes (TTC-v1) -------------------------------------------
+   Mirror of regadvisor_engine.clash_timetable / find_clashes / apply_timetable.
+   Two modules that share a lecture period cannot both be registered: the
+   lower level stays, the higher level gives way; equal levels go to a person.
+   timetable: {"1": {code: {block, periods:[...]}}, "2": {...}} */
+var DEFAULT_TIMETABLE_RULE = {enabled:true, exempt:[], rule_id:"TTC-v1"};
+var DAY = {Mon:0, Tue:1, Wed:2, Thu:3, Fri:4};
+
+function sortPeriods(ps){
+  var key = function(p){ p = String(p); var d = DAY[p.slice(0,3)];
+    return [d == null ? 9 : d, parseInt(p.slice(3), 10) || 0]; };
+  return ps.slice().sort(function(a, b){
+    var ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
+}
+
+function clashTimetable(timetable, ruleIn){
+  var rule = Object.assign({}, DEFAULT_TIMETABLE_RULE, ruleIn || {});
+  if(!timetable || !Object.keys(timetable).length || !rule.enabled) return {tt:{}, rule:rule};
+  var skip = new Set((rule.exempt || []).map(String));
+  var tt = {};
+  Object.keys(timetable).forEach(function(s){
+    tt[s] = {};
+    Object.keys(timetable[s]).forEach(function(c){ if(!skip.has(c)) tt[s][c] = timetable[s][c]; });
+  });
+  return {tt:tt, rule:rule};
+}
+
+function findClashes(codes, sem, timetable, levelOf){
+  levelOf = levelOf || codeLevel;
+  var slots = (timetable || {})[String(sem)] || {};
+  var seen = new Set(), placed = [];
+  codes.forEach(function(c){ if(!seen.has(c)){ seen.add(c); if(slots[c]) placed.push(c); } });
+  placed.sort(function(a, b){ return (levelOf(a) - levelOf(b)) || (a < b ? -1 : a > b ? 1 : 0); });
+  var keep = [], drop = [], ties = [];
+  var shared = function(a, b){
+    var pb = new Set(slots[b].periods); return slots[a].periods.filter(function(p){ return pb.has(p); }); };
+  placed.forEach(function(c){
+    var hits = keep.filter(function(k){ return shared(c, k).length; });
+    var lower = hits.filter(function(k){ return levelOf(k) < levelOf(c); });
+    if(lower.length){
+      var ps = new Set();
+      lower.forEach(function(k){ shared(c, k).forEach(function(p){ ps.add(p); }); });
+      drop.push({code:c, "with":lower, block:slots[c].block, periods:sortPeriods([...ps])});
+      return;
+    }
+    hits.forEach(function(k){
+      ties.push({codes:[k, c], block:slots[c].block, periods:sortPeriods(shared(c, k))}); });
+    keep.push(c);
+  });
+  return {keep:keep, drop:drop, ties:ties};
+}
+
+function clashReason(d, ruleId){
+  ruleId = ruleId || "TTC-v1";
+  if(d.tie) return "timetable clash at the same level with " + d["with"].join(", ")
+    + " (" + d.periods.join(" ") + "): needs a person [" + ruleId + "]";
+  return "timetable clash with " + d["with"].join(", ") + " (block " + (d.block || "?") + ", "
+    + d.periods.join(" ") + "): take the lower-level " + d["with"].join(", ")
+    + " first, deregister " + d.code + " [" + ruleId + "]";
+}
+
+/* verdicts: {code: {verdict, pc, repeat}} for the programme's modules, as
+   verdictFor returns them. Moves the higher module of each clash to
+   "timetable_clash" and same-level clashes to "needs_review", in place. */
+function applyTimetable(verdicts, modules, timetable, ruleIn){
+  var ct = clashTimetable(timetable, ruleIn), tt = ct.tt, rule = ct.rule;
+  if(!Object.keys(tt).length) return verdicts;
+  var byCode = {}; modules.forEach(function(m){ byCode[m.code] = m; });
+  var levelOf = function(c){ var m = byCode[c];
+    return m && typeof m.level === "number" ? m.level : codeLevel(c); };
+  var live = new Set(["can_register", "concession_possible", "needs_review"]);
+  var bySem = {};
+  modules.forEach(function(m){
+    var v = verdicts[m.code];
+    if(v && live.has(v.verdict) && typeof m.sem === "number")
+      (bySem[m.sem] = bySem[m.sem] || []).push(m.code);
+  });
+  Object.keys(bySem).sort().forEach(function(sem){
+    var res = findClashes(bySem[sem], sem, tt, levelOf);
+    res.drop.forEach(function(d){
+      var v = verdicts[d.code];
+      v.clash = Object.assign({}, d, {sem:+sem, was:v.verdict, rule_id:rule.rule_id,
+                                      reason:clashReason(d, rule.rule_id)});
+      v.verdict = "timetable_clash";
+    });
+    res.ties.forEach(function(t){
+      t.codes.forEach(function(code){
+        var tie = {code:code, "with":t.codes.filter(function(x){ return x !== code; }),
+                   block:t.block, periods:t.periods, tie:true};
+        var v = verdicts[code];
+        v.clash = Object.assign({}, tie, {sem:+sem, rule_id:rule.rule_id,
+                                          reason:clashReason(tie, rule.rule_id)});
+        v.verdict = "needs_review";
+      });
+    });
+  });
+  return verdicts;
+}
+
+/* every prescribed module's verdict with the clash rule applied -- the mirror
+   of eval_advice as a whole, which the per-module verdictFor cannot be. */
+function adviseAll(modules, tx, rules, timetable){
+  var out = {};
+  modules.forEach(function(m){
+    if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective") return;
+    out[m.code] = verdictFor(m, tx, rules);
+  });
+  return applyTimetable(out, modules, timetable, (rules || {}).timetable);
+}
+
 root.RA = {coreCode:coreCode, codeLevel:codeLevel, evalTerm:evalTerm,
            unmetCount:unmetCount, carryOk:carryOk, checkPrereqs:checkPrereqs,
-           verdictFor:verdictFor, indexMarks:indexMarks};
+           verdictFor:verdictFor, indexMarks:indexMarks,
+           findClashes:findClashes, applyTimetable:applyTimetable,
+           clashReason:clashReason, adviseAll:adviseAll};
 })(typeof window !== "undefined" ? window : globalThis);

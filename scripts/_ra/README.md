@@ -13,6 +13,7 @@ this folder and are covered by the same lock:
 | `scripts/_ra/programme_loader.py` | `scripts/programme_loader.py` |
 | `scripts/_ra/regadvisor_engine.py` | `scripts/regadvisor_engine.py` |
 | `catalogue/modules.yaml` | `catalogue/modules.yaml` |
+| `catalogue/timetable.yaml` | `catalogue/timetable.yaml` |
 | `programmes/civil.yaml` | `programmes/civil.yaml` |
 | `programmes/augmented_civil.yaml` | `programmes/augmented_civil.yaml` |
 
@@ -33,3 +34,10 @@ and level; the programme YAMLs state only where a module sits and what gates it.
 `build_explorer.py` passes the path explicitly and refuses to build if the file
 is absent — the loader's own fallback is silent, and a silent fallback here
 would put zero-credit modules on a student-facing page.
+
+`catalogue/timetable.yaml` is generated upstream from the School's semester
+timetable grids by `scripts/build_timetable.py`. It drives the timetable clash
+rule (TTC-v1). `build_explorer.py` passes its path explicitly too and refuses
+to build without it: a missing timetable means no clash can be shown, and the
+page would silently advise students to register two modules that meet at the
+same time.

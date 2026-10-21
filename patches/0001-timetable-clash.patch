@@ -1,0 +1,1380 @@
+From c2dee9b09b46e25e3c6a7f87f91ccbde65ec22a2 Mon Sep 17 00:00:00 2001
+From: JustinPringle <justin.j.pringle@gmail.com>
+Date: Wed, 21 Oct 2026 13:27:34 +0200
+Subject: [PATCH] Explorer: timetable clash rule (TTC-v1), synced from
+ reg_advisor
+
+Vendor reg_advisor's timetable clash rule and mirror it on the page. Two
+modules that share a lecture period cannot both be registered; the student
+takes the lower-level one first.
+
+- vendor_sync.py carries catalogue/timetable.yaml; re-synced engine,
+  loader and programme YAMLs from reg_advisor (TTC-v1).
+- build_explorer.py passes the timetable explicitly and refuses to build
+  without it; ships the timetable and rules.timetable in the payload; module
+  levels now come from the engine (ENPD7PP and ENPD7CL read L4, per ITS).
+- ra_engine.js mirrors find_clashes and apply_timetable; adviseAll gives
+  the page eval_advice's whole-set verdicts. A new parity profile exercises
+  a clash; parity 595/595.
+- The page shows a CLASH verdict, explains it in the inspector, draws a
+  leader to the lower-level module, and lists it on the advisory record.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BR865v759E36YCpUyyvxUx
+---
+ catalogue/timetable.yaml         | 137 ++++++++++++++++++++++
+ explorer.html                    | 189 +++++++++++++++++++++++++++----
+ programmes/augmented_civil.yaml  |  12 ++
+ programmes/civil.yaml            |  13 +++
+ scripts/_ra/README.md            |   8 ++
+ scripts/_ra/VENDOR.lock          |  14 ++-
+ scripts/_ra/programme_loader.py  |  44 ++++++-
+ scripts/_ra/regadvisor_engine.py | 150 +++++++++++++++++++++++-
+ scripts/build_explorer.py        |  32 +++++-
+ scripts/explorer_template.html   |  68 ++++++++---
+ scripts/ra_engine.js             | 117 ++++++++++++++++++-
+ scripts/vendor_sync.py           |   1 +
+ 12 files changed, 732 insertions(+), 53 deletions(-)
+ create mode 100644 catalogue/timetable.yaml
+
+diff --git a/catalogue/timetable.yaml b/catalogue/timetable.yaml
+new file mode 100644
+index 0000000..1efe673
+--- /dev/null
++++ b/catalogue/timetable.yaml
+@@ -0,0 +1,137 @@
++# timetable.yaml -- lecture periods per module, per semester.
++#
++# Two modules clash when they share a period. Read by
++# programme_loader.load_timetable and regadvisor_engine.find_clashes.
++#
++# GENERATED FILE -- do not hand-edit. Regenerate with:
++#   python scripts/build_timetable.py <S1.xlsx>:1 <S2.xlsx>:2 \
++#       --year 2026 --alias ENCV3GA=ENCV3G1 --out catalogue/timetable.yaml
++
++meta:
++  calendar_year: 2026
++  generated: '2026-10-21'
++  source: [Civ_Eng_Ttable_1st_semester_2026V2.xlsx, Civ_Eng_Ttable_2nd_Semester_2026V2.xlsx]
++  basis: lecture periods on the School timetable grid; (P)/(T) group sessions excluded
++  aliases: {ENCV3GA: ENCV3G1}
++  warnings: ['S1 Y4: ENPD7PP is block F on ''Blocking (CODES)'' but ''prof practice'' is block B on ''Blocking'';
++      used F', 'S1 Y4 ''engineering business'': on the grid but maps to no code (skipped)']
++semesters:
++  1:
++    CHEM181:
++      block: A
++      periods: [Thu2, Fri1]
++    EDSJ1CS:
++      block: C
++      periods: [Tue2, Tue3]
++    ENCH1TC:
++      block: D
++      periods: [Mon6]
++    ENCH4ML:
++      block: F
++      periods: [Wed5, Wed6]
++    ENCV2MT:
++      block: C
++      periods: [Tue2, Tue3, Thu1, Fri4]
++    ENCV2SA:
++      block: D
++      periods: [Mon6, Tue4, Tue5, Wed1, Fri7]
++    ENCV3FA:
++      block: A
++      periods: [Tue6, Thu2, Thu3, Fri4, Fri5]
++    ENCV3G1:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Wed2, Thu7]
++    ENCV3ST:
++      block: B
++      periods: [Tue8, Tue9, Tue11, Wed7, Thu4, Thu5, Fri2]
++    ENCV3TT:
++      block: F
++      periods: [Mon2, Mon3, Wed3, Wed4, Wed5, Fri3]
++    ENCV4GS:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Wed2, Thu7, Fri8, Fri9]
++    ENCV4TE:
++      block: D
++      periods: [Mon6, Tue4, Tue5, Wed1, Fri7]
++    ENCV4WE:
++      block: C
++      periods: [Mon7, Thu1, Thu2, Thu3, Fri4]
++    ENEL4EE:
++      block: F
++      periods: [Mon2, Mon3]
++    ENME1DR:
++      block: B
++      periods: [Wed7]
++    ENPD7PP:
++      block: F
++      periods: [Thu4, Thu5, Thu6, Fri1, Fri2, Fri3]
++    ENSV2SE:
++      block: B
++      periods: [Thu4, Thu5, Fri1, Fri2]
++    MATH131:
++      block: F
++      periods: [Mon2, Mon3, Tue7, Thu6]
++    MATH132:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Fri8]
++    MATH238:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Wed2]
++    PHYS151:
++      block: B
++      periods: [Mon1, Tue8, Thu4, Thu5]
++    STAT370:
++      block: D
++      periods: [Tue4, Tue5, Wed1, Fri7]
++  2:
++    CHEM191:
++      block: A
++      periods: [Thu2, Fri1]
++    ENCV1ED:
++      block: C
++      periods: [Tue2, Tue3]
++    ENCV2FL:
++      block: B
++      periods: [Thu4, Thu5, Fri2]
++    ENCV2SB:
++      block: A
++      periods: [Tue6, Thu2, Thu3, Fri1, Fri5]
++    ENCV2SD:
++      block: D
++      periods: [Mon6, Tue4, Tue5, Wed1, Thu8, Thu9, Fri7]
++    ENCV3FB:
++      block: A
++      periods: [Tue6, Thu2, Thu3, Fri4, Fri5]
++    ENCV3G2:
++      block: F
++      periods: [Mon2, Mon3, Wed3, Wed4, Wed5, Fri3]
++    ENCV3MS:
++      block: C
++      periods: [Mon7, Tue2, Tue3, Thu1]
++    ENCV3SD:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Wed2, Thu7]
++    ENCV3TP:
++      block: B
++      periods: [Thu4, Thu5, Fri2]
++    ENME1EM:
++      block: E
++      periods: [Fri8, Fri9]
++    ENPD7CL:
++      block: D
++      periods: [Mon6, Tue4, Tue5, Wed1, Wed8, Wed9]
++    GEOL215:
++      block: F
++      periods: [Mon2, Mon3, Wed3, Wed4, Wed5, Fri3]
++    MATH141:
++      block: F
++      periods: [Mon2, Mon3, Tue7, Thu6]
++    MATH142:
++      block: E
++      periods: [Mon4, Mon5, Mon8, Tue1]
++    MATH248:
++      block: E
++      periods: [Mon4, Mon5, Tue1, Wed2]
++    PHYS152:
++      block: B
++      periods: [Mon1, Tue8, Tue9, Thu4, Thu5]
+diff --git a/explorer.html b/explorer.html
+index 1fa0d55..c65a229 100644
+--- a/explorer.html
++++ b/explorer.html
+@@ -130,6 +130,9 @@ main{
+ .cell[data-elig="concession"]{background:var(--conc-fill); border-color:var(--conc-ink);
+   background-image:none}
+ .cell[data-elig="concession"] .code{color:var(--conc-ink)}
++.cell[data-elig="clash"]{background:var(--amber-bg); border-color:var(--must-bar);
++  background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(133,79,11,.07) 5px 6px)}
++.cell[data-elig="clash"] .code{color:var(--must-bar)}
+ .cell[data-kind="dp"]{border-style:dashed}
+ .cell[data-kind="elective"]{border-style:dotted}
+ .cell[data-kind="elective"] .code{color:var(--blue)}
+@@ -164,6 +167,7 @@ aside h2{
+ .verdict.blocked{border-left-color:var(--fail-ink)}
+ .verdict.done{border-left-color:var(--pass-ink)}
+ .verdict.concession{border-left-color:var(--conc-ink); background:var(--conc-fill)}
++.verdict.clash{border-left-color:var(--must-bar); background:var(--amber-bg)}
+ .verdict b{font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+   text-transform:uppercase; display:block; margin-bottom:3px}
+ .verdict ul{margin:6px 0 0; padding-left:16px}
+@@ -219,6 +223,7 @@ footer .v{font-weight:600}
+ .keybar .sw.blocked{background:var(--block-fill);
+   background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.06) 3px 4px)}
+ .keybar .sw.conc{background:var(--conc-fill); border-color:var(--conc-ink)}
++.keybar .sw.clash{background:var(--amber-bg); border-color:var(--must-bar)}
+ .keybar .sw.dp{border-style:dashed}
+ .keybar .note{font-style:italic; color:var(--ink3)}
+ 
+@@ -388,11 +393,12 @@ footer .v{font-weight:600}
+   <span class="kk"><i class="sw"></i>May register</span>
+   <span class="kk"><i class="sw conc"></i>Concession possible</span>
+   <span class="kk"><i class="sw blocked"></i>Blocked — prerequisites unmet</span>
++  <span class="kk"><i class="sw clash"></i>Timetable clash — take the lower level first</span>
+   <span class="kk"><i class="sw review"></i>Review — see coordinator</span>
+   <span class="kk"><i class="sw dp"></i>DP (no credit)</span>
+   <span class="kk"><i class="sw plan"></i>In my registration plan (tick the box on a card)</span>
+   <span class="spacer"></span>
+-  <span class="note">Prerequisites &amp; progression only — not load limits or term decisions.</span>
++  <span class="note">Prerequisites, progression &amp; timetable clashes — not load limits or term decisions.</span>
+ </div>
+ 
+ <main>
+@@ -416,7 +422,8 @@ footer .v{font-weight:600}
+ 
+ <script>/* ra_engine.js — a faithful mirror of reg_advisor/scripts/regadvisor_engine.py.
+    reg_advisor is the single source of truth; this file re-implements eval_term,
+-   check_prereqs, carry_ok, unmet_count and the four-bucket verdict exactly, so
++   check_prereqs, carry_ok, unmet_count, the four-bucket verdict and the
++   timetable clash rule (find_clashes / apply_timetable) exactly, so
+    the explorer page agrees with the advisor. build_explorer.py embeds parity
+    cases computed by the PYTHON engine; the page re-runs them and reports parity.
+ 
+@@ -636,14 +643,126 @@ function indexMarks(marksByCode, modByCode, passMark, equivalences, coreLen){
+           year_of_study:0, semesters_registered:0, core_len:coreLen};
+ }
+ 
++/* ---- timetable clashes (TTC-v1) -------------------------------------------
++   Mirror of regadvisor_engine.clash_timetable / find_clashes / apply_timetable.
++   Two modules that share a lecture period cannot both be registered: the
++   lower level stays, the higher level gives way; equal levels go to a person.
++   timetable: {"1": {code: {block, periods:[...]}}, "2": {...}} */
++var DEFAULT_TIMETABLE_RULE = {enabled:true, exempt:[], rule_id:"TTC-v1"};
++var DAY = {Mon:0, Tue:1, Wed:2, Thu:3, Fri:4};
++
++function sortPeriods(ps){
++  var key = function(p){ p = String(p); var d = DAY[p.slice(0,3)];
++    return [d == null ? 9 : d, parseInt(p.slice(3), 10) || 0]; };
++  return ps.slice().sort(function(a, b){
++    var ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
++}
++
++function clashTimetable(timetable, ruleIn){
++  var rule = Object.assign({}, DEFAULT_TIMETABLE_RULE, ruleIn || {});
++  if(!timetable || !Object.keys(timetable).length || !rule.enabled) return {tt:{}, rule:rule};
++  var skip = new Set((rule.exempt || []).map(String));
++  var tt = {};
++  Object.keys(timetable).forEach(function(s){
++    tt[s] = {};
++    Object.keys(timetable[s]).forEach(function(c){ if(!skip.has(c)) tt[s][c] = timetable[s][c]; });
++  });
++  return {tt:tt, rule:rule};
++}
++
++function findClashes(codes, sem, timetable, levelOf){
++  levelOf = levelOf || codeLevel;
++  var slots = (timetable || {})[String(sem)] || {};
++  var seen = new Set(), placed = [];
++  codes.forEach(function(c){ if(!seen.has(c)){ seen.add(c); if(slots[c]) placed.push(c); } });
++  placed.sort(function(a, b){ return (levelOf(a) - levelOf(b)) || (a < b ? -1 : a > b ? 1 : 0); });
++  var keep = [], drop = [], ties = [];
++  var shared = function(a, b){
++    var pb = new Set(slots[b].periods); return slots[a].periods.filter(function(p){ return pb.has(p); }); };
++  placed.forEach(function(c){
++    var hits = keep.filter(function(k){ return shared(c, k).length; });
++    var lower = hits.filter(function(k){ return levelOf(k) < levelOf(c); });
++    if(lower.length){
++      var ps = new Set();
++      lower.forEach(function(k){ shared(c, k).forEach(function(p){ ps.add(p); }); });
++      drop.push({code:c, "with":lower, block:slots[c].block, periods:sortPeriods([...ps])});
++      return;
++    }
++    hits.forEach(function(k){
++      ties.push({codes:[k, c], block:slots[c].block, periods:sortPeriods(shared(c, k))}); });
++    keep.push(c);
++  });
++  return {keep:keep, drop:drop, ties:ties};
++}
++
++function clashReason(d, ruleId){
++  ruleId = ruleId || "TTC-v1";
++  if(d.tie) return "timetable clash at the same level with " + d["with"].join(", ")
++    + " (" + d.periods.join(" ") + "): needs a person [" + ruleId + "]";
++  return "timetable clash with " + d["with"].join(", ") + " (block " + (d.block || "?") + ", "
++    + d.periods.join(" ") + "): take the lower-level " + d["with"].join(", ")
++    + " first, deregister " + d.code + " [" + ruleId + "]";
++}
++
++/* verdicts: {code: {verdict, pc, repeat}} for the programme's modules, as
++   verdictFor returns them. Moves the higher module of each clash to
++   "timetable_clash" and same-level clashes to "needs_review", in place. */
++function applyTimetable(verdicts, modules, timetable, ruleIn){
++  var ct = clashTimetable(timetable, ruleIn), tt = ct.tt, rule = ct.rule;
++  if(!Object.keys(tt).length) return verdicts;
++  var byCode = {}; modules.forEach(function(m){ byCode[m.code] = m; });
++  var levelOf = function(c){ var m = byCode[c];
++    return m && typeof m.level === "number" ? m.level : codeLevel(c); };
++  var live = new Set(["can_register", "concession_possible", "needs_review"]);
++  var bySem = {};
++  modules.forEach(function(m){
++    var v = verdicts[m.code];
++    if(v && live.has(v.verdict) && typeof m.sem === "number")
++      (bySem[m.sem] = bySem[m.sem] || []).push(m.code);
++  });
++  Object.keys(bySem).sort().forEach(function(sem){
++    var res = findClashes(bySem[sem], sem, tt, levelOf);
++    res.drop.forEach(function(d){
++      var v = verdicts[d.code];
++      v.clash = Object.assign({}, d, {sem:+sem, was:v.verdict, rule_id:rule.rule_id,
++                                      reason:clashReason(d, rule.rule_id)});
++      v.verdict = "timetable_clash";
++    });
++    res.ties.forEach(function(t){
++      t.codes.forEach(function(code){
++        var tie = {code:code, "with":t.codes.filter(function(x){ return x !== code; }),
++                   block:t.block, periods:t.periods, tie:true};
++        var v = verdicts[code];
++        v.clash = Object.assign({}, tie, {sem:+sem, rule_id:rule.rule_id,
++                                          reason:clashReason(tie, rule.rule_id)});
++        v.verdict = "needs_review";
++      });
++    });
++  });
++  return verdicts;
++}
++
++/* every prescribed module's verdict with the clash rule applied -- the mirror
++   of eval_advice as a whole, which the per-module verdictFor cannot be. */
++function adviseAll(modules, tx, rules, timetable){
++  var out = {};
++  modules.forEach(function(m){
++    if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective") return;
++    out[m.code] = verdictFor(m, tx, rules);
++  });
++  return applyTimetable(out, modules, timetable, (rules || {}).timetable);
++}
++
+ root.RA = {coreCode:coreCode, codeLevel:codeLevel, evalTerm:evalTerm,
+            unmetCount:unmetCount, carryOk:carryOk, checkPrereqs:checkPrereqs,
+-           verdictFor:verdictFor, indexMarks:indexMarks};
++           verdictFor:verdictFor, indexMarks:indexMarks,
++           findClashes:findClashes, applyTimetable:applyTimetable,
++           clashReason:clashReason, adviseAll:adviseAll};
+ })(typeof window !== "undefined" ? window : globalThis);
+ </script>
+ <script>
+-const PAYLOAD = {"programmes": {"ENG-CIVIL": {"code": "ENG-CIVIL", "name": "Civil Engineering", "stream": "mainstream", "passMark": 50, "refer": ["ENCV4DE", "ENCV4DS"], "rules": {"concession": {"min_gpa": 55, "max_missing": 1, "prereq_floor": 45}, "electives": {"min_other_credits": 24, "required": [{"level": 4, "credits": 8, "school": "EN", "count": 1, "label": "Level-4 8-credit School of Engineering elective"}], "options": ["ACCT103", "ANTH101", "ECHS101", "ECON101", "ENEL4EB", "ENEL4EE", "ENGL102", "FREN101", "HIST104", "HIST105", "INST102", "LAWS1AS", "LING101", "LING102", "POLS101", "POLS102", "PSYC102", "RELG101", "RELG106", "SPAN102", "ZULM101", "ZULM102", "ZULM105", "ZULM106", "ZULN101", "ZULN102"]}}, "progression": {"1": [48, 72, 54], "2": [96, 144, 108], "3": [144, 216, 162], "4": [192, 288, 216], "5": [240, 360, 270], "6": [288, 432, 324], "7": [336, 504, 378], "8": [384, 576, 432], "9": [432, null, null], "10": [480, null, null], "11": [528, null, null], "12": [576, null, null]}, "equivalences": [["MATH160", "MATH131"], ["MATH161", "MATH141"], ["PHYS160", "PHYS151"], ["PHYS163", "PHYS152"], ["ENME160", "ENME1DR"], ["ENCH160", "ENCH1TC"], ["ENAG161", "ENME1EM"], ["ENAG160", "ENCV1ED"]], "modules": [{"code": "CHEM181", "name": "Chemistry for Engineers 1A", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCH1TC", "name": "Technical Communication for Engineers", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENME1DR", "name": "Engineering Drawing", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH131", "name": "Mathematics 1A (Eng)", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH132", "name": "Applied Mathematics 1A (Eng)", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS151", "name": "Engineering Physics 1A", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [{"any": ["MATH130", "MATH195"]}], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM191", "name": "Chemistry for Engineers 1B", "credits": 8, "year": 1, "sem": 2, "prereqs": [{"code": "CHEM181", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV1ED", "name": "Introduction to Civil Design", "credits": 8, "year": 1, "sem": 2, "prereqs": ["ENME1DR"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENME1EM", "name": "Introduction to Engineering Materials", "credits": 8, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH141", "name": "Mathematics 1B (Eng)", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "MATH131", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH142", "name": "Applied Mathematics 1B (Eng)", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "MATH131", "min_mark": 40}, {"code": "MATH132", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS152", "name": "Engineering Physics 1B", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "PHYS151", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV1EP", "name": "Engineering Practice Workshop", "credits": 0, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV2MT", "name": "Civil Engineering Materials", "credits": 8, "year": 2, "sem": 1, "prereqs": ["ENME1EM"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SA", "name": "Structures 1", "credits": 16, "year": 2, "sem": 1, "prereqs": ["MATH141", "MATH142"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENSV2SE", "name": "Surveying Engineering", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH238", "name": "Mathematics 2A (Eng)", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"code": "MATH131", "min_mark": 50}, {"code": "MATH141", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ZULN101_OR", "name": "Basic isiZulu Language Studies (or other language)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_Y2S1", "level": 1}, {"code": "ELECTIVE_Y2S1", "name": "Elective (in place of ZULN101)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_Y2S1", "level": 2}, {"code": "ENCV2FL", "name": "Fluids 1", "credits": 8, "year": 2, "sem": 2, "prereqs": ["MATH142", {"any": ["PHYS151", "PHYS110"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2MW", "name": "Materials Workshop Course", "credits": 0, "year": 2, "sem": 2, "prereqs": ["ENCV2MT"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SB", "name": "Structures 2", "credits": 16, "year": 2, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SD", "name": "Structural Design 1", "credits": 16, "year": 2, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "GEOL215", "name": "Elements of Geology for Civil Engineers", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH248", "name": "Mathematics 2B (Eng)", "credits": 16, "year": 2, "sem": 2, "prereqs": ["MATH238", "MATH141"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3FA", "name": "Fluids 2", "credits": 16, "year": 3, "sem": 1, "prereqs": ["ENCV2FL"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G1", "name": "Geotechnical Engineering Studies 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 32, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3ST", "name": "Structures 3", "credits": 16, "year": 3, "sem": 1, "prereqs": ["ENCV2SA", "ENCV2SB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TT", "name": "Transport 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_year": 3}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "STAT370", "name": "Engineering Statistics", "credits": 8, "year": 3, "sem": 1, "prereqs": ["MATH248"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3CW", "name": "Civil CADD Workshop", "credits": 0, "year": 3, "sem": 2, "prereqs": ["ENCV3ST", "ENCV2SD"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3FB", "name": "Fluids 3", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2FL", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G2", "name": "Geotechnical Engineering Studies 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV3G1"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3SD", "name": "Structural Design 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TP", "name": "Transport 2", "credits": 8, "year": 3, "sem": 2, "prereqs": ["ENCV3G1", "ENCV3TT", "GEOL215"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3MS", "name": "Mathematical Systems", "credits": 8, "year": 3, "sem": 2, "prereqs": ["MATH238", "MATH248", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ELECTIVE_Y3S2", "name": "Elective", "credits": 8, "year": 3, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 3}, {"code": "ENCH4ML", "name": "Engineering Management & Labour Relations", "credits": 8, "year": 4, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 96, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4GS", "name": "Ground and Structural Engineering", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV3G1", "ENCV3G2", "ENCV3SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4TE", "name": "Transport and Environmental Management", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV3TT"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4WE", "name": "Water and Environmental Engineering", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2FL", "ENCV3FA", "ENCV3FB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7PP", "name": "Professional Practice", "credits": 8, "year": 4, "sem": 1, "prereqs": [{"min_year": 4}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 7}, {"code": "ELECTIVE_Y4S1", "name": "Elective", "credits": 8, "year": 4, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}, {"code": "ENCV4DE", "name": "Civil Engineering Design Project", "credits": 24, "year": 4, "sem": 2, "prereqs": [{"all": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4DS", "name": "Dissertation", "credits": 24, "year": 4, "sem": 2, "prereqs": [{"all": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4VW", "name": "Vacation Work", "credits": 0, "year": 4, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7CL", "name": "Management of Construction Contracts", "credits": 8, "year": 4, "sem": 2, "prereqs": [{"min_year": 4}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 7}, {"code": "ELECTIVE_Y4S2", "name": "Elective", "credits": 16, "year": 4, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}]}, "ENG-CIVIL-AUG": {"code": "ENG-CIVIL-AUG", "name": "Civil Engineering (Augmented)", "stream": "augmented", "passMark": 50, "refer": [], "rules": {"concession": {"min_gpa": 55, "max_missing": 1, "prereq_floor": 45}, "electives": {"min_other_credits": 24, "required": [{"level": 4, "credits": 8, "school": "EN", "count": 1, "label": "Level-4 8-credit School of Engineering elective"}], "options": ["ACCT103", "ANTH101", "ECHS101", "ECON101", "ENEL4EB", "ENEL4EE", "ENGL102", "FREN101", "HIST104", "HIST105", "INST102", "LAWS1AS", "LING101", "LING102", "POLS101", "POLS102", "PSYC102", "RELG101", "RELG106", "SPAN102", "ZULM101", "ZULM102", "ZULM105", "ZULM106", "ZULN101", "ZULN102"]}}, "progression": {"1": [0, 16, 0], "2": [32, 64, 48], "3": [56, 104, 78], "4": [96, 176, 132], "5": [144, 240, 180], "6": [192, 304, 228], "7": [240, 368, 276], "8": [288, 432, 324], "9": [336, 504, null], "10": [384, 576, null], "11": [432, null, null], "12": [480, null, null], "13": [528, null, null], "14": [576, null, null]}, "equivalences": [["MATH160", "MATH131"], ["MATH161", "MATH141"], ["PHYS160", "PHYS151"], ["PHYS163", "PHYS152"], ["ENME160", "ENME1DR"], ["ENCH160", "ENCH1TC"], ["ENAG161", "ENME1EM"], ["ENAG160", "ENCV1ED"]], "modules": [{"code": "ENME160", "name": "Augmented Engineering Drawing", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCH160", "name": "Augmented Tech. Communication for Engineers", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH160", "name": "Augmented Engineering Mathematics 1A", "credits": 16, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS160", "name": "Augmented Engineering Physics 1A", "credits": 16, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENAG161", "name": "Augmented Engineering Materials", "credits": 8, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENAG160", "name": "Augmented Engineering Design", "credits": 8, "year": 1, "sem": 2, "prereqs": [{"any": ["ENME160", "ENME1DR"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH132", "name": "Applied Mathematics 1A (Eng)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM181", "name": "Chemistry for Engineers 1A", "credits": 8, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENSV2SE", "name": "Surveying Engineering", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH161", "name": "Augmented Engineering Mathematics 1B", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 40}, {"code": "MATH131", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS163", "name": "Augmented Engineering Physics 1B", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "PHYS160", "min_mark": 40}, {"code": "PHYS151", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH142", "name": "Applied Mathematics 1B (Eng)", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 40}, {"code": "MATH131", "min_mark": 40}]}, {"code": "MATH132", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM191", "name": "Chemistry for Engineers 1B", "credits": 8, "year": 2, "sem": 2, "prereqs": [{"code": "CHEM181", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ZULN101_OR", "name": "Basic isiZulu Language Studies (or other language)", "credits": 16, "year": 2, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_AUG", "level": 1}, {"code": "ELECTIVE_AUG", "name": "Elective (in place of ZULN101)", "credits": 16, "year": 2, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_AUG", "level": 0}, {"code": "ENCV2MT", "name": "Civil Engineering Materials", "credits": 8, "year": 3, "sem": 1, "prereqs": [{"any": ["ENAG161", "ENME1EM"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SA", "name": "Structures 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"any": ["MATH161", "MATH141"]}, "MATH142"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH238", "name": "Mathematics 2A (Eng)", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 50}, {"code": "MATH131", "min_mark": 50}]}, {"any": [{"code": "MATH161", "min_mark": 40}, {"code": "MATH141", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3TT", "name": "Transport 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_year": 3}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV2FL", "name": "Fluids 1", "credits": 8, "year": 3, "sem": 2, "prereqs": ["MATH142", {"any": ["PHYS160", "PHYS151", "PHYS110"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2MW", "name": "Materials Workshop Course", "credits": 0, "year": 3, "sem": 2, "prereqs": ["ENCV2MT"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SB", "name": "Structures 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SD", "name": "Structural Design 1", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "GEOL215", "name": "Elements of Geology for Civil Engineers", "credits": 16, "year": 3, "sem": 2, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH248", "name": "Mathematics 2B (Eng)", "credits": 16, "year": 3, "sem": 2, "prereqs": ["MATH238", {"any": ["MATH161", "MATH141"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3FA", "name": "Fluids 2", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2FL"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G1", "name": "Geotechnical Engineering Studies 1", "credits": 16, "year": 4, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 32, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3ST", "name": "Structures 3", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2SA", "ENCV2SB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "STAT370", "name": "Engineering Statistics", "credits": 8, "year": 4, "sem": 1, "prereqs": ["MATH248"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ELECTIVE_Y4S1", "name": "Elective", "credits": 8, "year": 4, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}, {"code": "ENCV3CW", "name": "Civil CADD Workshop", "credits": 0, "year": 4, "sem": 2, "prereqs": ["ENCV3ST", "ENCV2SD"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3FB", "name": "Fluids 3", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV2FL", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G2", "name": "Geotechnical Engineering Studies 2", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV3G1"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3SD", "name": "Structural Design 2", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV2SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TP", "name": "Transport 2", "credits": 8, "year": 4, "sem": 2, "prereqs": ["ENCV3G1", "ENCV3TT", "GEOL215"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3MS", "name": "Mathematical Systems", "credits": 8, "year": 4, "sem": 2, "prereqs": ["MATH238", "MATH248", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCH4ML", "name": "Engineering Management & Labour Relations", "credits": 8, "year": 5, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 96, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4GS", "name": "Ground and Structural Engineering", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV3G1", "ENCV3G2", "ENCV3SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4TE", "name": "Transport and Environmental Management", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV3TT"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4WE", "name": "Water and Environmental Engineering", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV2FL", "ENCV3FA", "ENCV3FB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7PP", "name": "Professional Practice", "credits": 8, "year": 5, "sem": 1, "prereqs": [{"min_year": 5}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 7}, {"code": "ELECTIVE_Y5S1", "name": "Elective", "credits": 8, "year": 5, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 5}, {"code": "ENCV4DE", "name": "Civil Engineering Design Project", "credits": 24, "year": 5, "sem": 2, "prereqs": [{"all": ["ENME160", "ENCH160", "MATH160", "PHYS160", "ENAG161", "ENAG160", "MATH132", "CHEM181", "ENSV2SE", "MATH161", "PHYS163", "MATH142", "CHEM191", "ENCV2MT", "ENCV2SA", "MATH238", "ENCV3TT", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4DS", "name": "Dissertation", "credits": 24, "year": 5, "sem": 2, "prereqs": [{"all": ["ENME160", "ENCH160", "MATH160", "PHYS160", "ENAG161", "ENAG160", "MATH132", "CHEM181", "ENSV2SE", "MATH161", "PHYS163", "MATH142", "CHEM191", "ENCV2MT", "ENCV2SA", "MATH238", "ENCV3TT", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4VW", "name": "Vacation Work", "credits": 0, "year": 5, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 4}, {"code": "ELECTIVE_Y5S2", "name": "Elective", "credits": 16, "year": 5, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 5}, {"code": "ENPD7CL", "name": "Management of Construction Contracts", "credits": 8, "year": 5, "sem": 2, "prereqs": [{"min_year": 5}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 7}]}}, "electiveCatalogue": {"ACCT103": {"name": "Accounting 103", "credits": 16, "level": 1, "blocks": [2]}, "ANTH101": {"name": "Introduction to Anthropology", "credits": 16, "level": 1, "blocks": [1]}, "ECHS101": {"name": "Political Economy of Food in a Global Context", "credits": 16, "level": 1, "blocks": [1]}, "ECON101": {"name": "Principles of Microeconomics", "credits": 16, "level": 1, "blocks": [1]}, "ENEL4EB": {"name": "Engineering Business", "credits": 8, "level": 4, "blocks": [1, 2]}, "ENEL4EE": {"name": "Engineering Entrepreneurship", "credits": 8, "level": 4, "blocks": [1, 2]}, "ENGL102": {"name": "Introduction to English Studies B", "credits": 16, "level": 1, "blocks": [2]}, "FREN101": {"name": "French 1A: French for Beginners", "credits": 16, "level": 1, "blocks": [1]}, "HIST104": {"name": "The Making of the Modern World", "credits": 16, "level": 1, "blocks": [1]}, "HIST105": {"name": "Empires of the Modern World", "credits": 16, "level": 1, "blocks": [2]}, "INST102": {"name": "News Media in the Internet Society", "credits": 16, "level": 1, "blocks": [2]}, "LAWS1AS": {"name": "Aspects of South African Law", "credits": 16, "level": 1, "blocks": [2]}, "LING101": {"name": "Understanding Language", "credits": 16, "level": 1, "blocks": [1]}, "LING102": {"name": "Linguistics 1B: Intro to Language studies", "credits": 16, "level": 1, "blocks": [2]}, "POLS101": {"name": "Introduction to Political Science", "credits": 16, "level": 1, "blocks": [1]}, "POLS102": {"name": "Introduction to Global Politics", "credits": 16, "level": 1, "blocks": [2]}, "PSYC102": {"name": "Introduction to Psychology B", "credits": 16, "level": 1, "blocks": [2]}, "RELG101": {"name": "Introduction to Religion", "credits": 16, "level": 1, "blocks": [1]}, "RELG106": {"name": "Religion and Conflict", "credits": 16, "level": 1, "blocks": [2]}, "SPAN102": {"name": "Spanish 1B", "credits": 16, "level": 1, "blocks": [2]}, "ZULM101": {"name": "Introduction to IsiZulu A", "credits": 16, "level": 1, "blocks": [1]}, "ZULM102": {"name": "Introduction to IsiZulu B", "credits": 16, "level": 1, "blocks": [2]}, "ZULM105": {"name": "Academic Writing", "credits": 16, "level": 1, "blocks": [1, 2]}, "ZULM106": {"name": "Semiotics of African Cosmology", "credits": 16, "level": 1, "blocks": [2]}, "ZULN101": {"name": "Basic IsiZulu Language Studies A", "credits": 16, "level": 1, "blocks": [1, 2]}, "ZULN102": {"name": "Basic IsiZulu Language Studies B", "credits": 16, "level": 1, "blocks": [2]}}, "source": "reg_advisor (submodule) \u2014 single source of truth"};
+-const PARITY  = {"ENG-CIVIL": [{"marks": {}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "ENCH1TC": "can_register", "ENME1DR": "can_register", "MATH131": "can_register", "MATH132": "can_register", "PHYS151": "can_register", "ENME1EM": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "ENCV1ED": "cannot_register", "MATH141": "cannot_register", "MATH142": "cannot_register", "PHYS152": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42, "MATH132": 80, "PHYS151": 80}, "gpa": 71.55555555555556, "gpa_passed": 80.0, "buckets": {"MATH131": "can_register", "CHEM191": "can_register", "ENCV1ED": "can_register", "ENME1EM": "can_register", "MATH141": "can_register", "MATH142": "can_register", "PHYS152": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "CHEM181": "passed", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH132": "passed", "PHYS151": "passed"}}, {"marks": {"ENME1DR": 48}, "gpa": 48.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "ENCH1TC": "can_register", "ENME1DR": "can_register", "MATH131": "can_register", "MATH132": "can_register", "PHYS151": "can_register", "ENME1EM": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "ENCV1ED": "cannot_register", "MATH141": "cannot_register", "MATH142": "cannot_register", "PHYS152": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80, "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80, "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"ENCH1TC": "can_register", "ENCV1EP": "can_register", "ENCV2MT": "can_register", "ENCV2SA": "can_register", "MATH238": "can_register", "ENCV2FL": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "CHEM181": "passed", "ENME1DR": "passed", "MATH131": "passed", "MATH132": "passed", "PHYS151": "passed", "CHEM191": "passed", "ENCV1ED": "passed", "ENME1EM": "passed", "MATH141": "passed", "MATH142": "passed", "PHYS152": "passed"}}, {"marks": {"MATH160": 70, "MATH161": 70, "PHYS160": 70, "PHYS163": 70, "ENCH160": 70, "ENME160": 70, "ENAG160": 70, "ENAG161": 70}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "MATH132": "can_register", "ENCV1EP": "can_register", "ENCV2MT": "can_register", "MATH238": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "MATH142": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH131": "passed", "PHYS151": "passed", "ENCV1ED": "passed", "ENME1EM": "passed", "MATH141": "passed", "PHYS152": "passed"}}, {"marks": {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30, "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76}, "gpa": 69.5, "gpa_passed": 77.4, "buckets": {"MATH131": "can_register", "ENCV1ED": "can_register", "ENME1EM": "can_register", "PHYS152": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "MATH142": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "CHEM181": "passed", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH132": "passed", "PHYS151": "passed", "CHEM191": "passed", "MATH141": "passed"}}], "ENG-CIVIL-AUG": [{"marks": {}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"ENME160": "can_register", "ENCH160": "can_register", "MATH160": "can_register", "PHYS160": "can_register", "ENAG161": "can_register", "MATH132": "can_register", "CHEM181": "can_register", "ENCV4VW": "can_register", "ENAG160": "cannot_register", "ENSV2SE": "cannot_register", "MATH161": "cannot_register", "PHYS163": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42, "MATH132": 80, "PHYS151": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"MATH160": "can_register", "ENAG161": "can_register", "ENAG160": "can_register", "MATH161": "can_register", "PHYS163": "can_register", "MATH142": "can_register", "CHEM191": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "ENCH160": "passed", "PHYS160": "passed", "MATH132": "passed", "CHEM181": "passed"}}, {"marks": {"ENME1DR": 48}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"ENME160": "can_register", "ENCH160": "can_register", "MATH160": "can_register", "PHYS160": "can_register", "ENAG161": "can_register", "MATH132": "can_register", "CHEM181": "can_register", "ENCV4VW": "can_register", "ENAG160": "cannot_register", "ENSV2SE": "cannot_register", "MATH161": "cannot_register", "PHYS163": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80, "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80, "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"ENCH160": "can_register", "ENCV2MT": "can_register", "ENCV2SA": "can_register", "MATH238": "can_register", "ENCV2FL": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "MATH160": "passed", "PHYS160": "passed", "ENAG161": "passed", "ENAG160": "passed", "MATH132": "passed", "CHEM181": "passed", "MATH161": "passed", "PHYS163": "passed", "MATH142": "passed", "CHEM191": "passed"}}, {"marks": {"MATH160": 70, "MATH161": 70, "PHYS160": 70, "PHYS163": 70, "ENCH160": 70, "ENME160": 70, "ENAG160": 70, "ENAG161": 70}, "gpa": 70.0, "gpa_passed": 70.0, "buckets": {"MATH132": "can_register", "CHEM181": "can_register", "ENCV2MT": "can_register", "MATH238": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2SA": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "ENCH160": "passed", "MATH160": "passed", "PHYS160": "passed", "ENAG161": "passed", "ENAG160": "passed", "MATH161": "passed", "PHYS163": "passed"}}, {"marks": {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30, "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76}, "gpa": 77.5, "gpa_passed": 77.5, "buckets": {"MATH160": "can_register", "ENAG161": "can_register", "ENAG160": "can_register", "PHYS163": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "MATH142": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "ENCH160": "passed", "PHYS160": "passed", "MATH132": "passed", "CHEM181": "passed", "MATH161": "passed", "CHEM191": "passed"}}]};
++const PAYLOAD = {"programmes": {"ENG-CIVIL": {"code": "ENG-CIVIL", "name": "Civil Engineering", "stream": "mainstream", "passMark": 50, "refer": ["ENCV4DE", "ENCV4DS"], "rules": {"concession": {"min_gpa": 55, "max_missing": 1, "prereq_floor": 45}, "electives": {"min_other_credits": 24, "required": [{"level": 4, "credits": 8, "school": "EN", "count": 1, "label": "Level-4 8-credit School of Engineering elective"}], "options": ["ACCT103", "ANTH101", "ECHS101", "ECON101", "ENEL4EB", "ENEL4EE", "ENGL102", "FREN101", "HIST104", "HIST105", "INST102", "LAWS1AS", "LING101", "LING102", "POLS101", "POLS102", "PSYC102", "RELG101", "RELG106", "SPAN102", "ZULM101", "ZULM102", "ZULM105", "ZULM106", "ZULN101", "ZULN102"]}, "timetable": {"enabled": true, "rule_id": "TTC-v1", "exempt": []}}, "progression": {"1": [48, 72, 54], "2": [96, 144, 108], "3": [144, 216, 162], "4": [192, 288, 216], "5": [240, 360, 270], "6": [288, 432, 324], "7": [336, 504, 378], "8": [384, 576, 432], "9": [432, null, null], "10": [480, null, null], "11": [528, null, null], "12": [576, null, null]}, "equivalences": [["MATH160", "MATH131"], ["MATH161", "MATH141"], ["PHYS160", "PHYS151"], ["PHYS163", "PHYS152"], ["ENME160", "ENME1DR"], ["ENCH160", "ENCH1TC"], ["ENAG161", "ENME1EM"], ["ENAG160", "ENCV1ED"]], "modules": [{"code": "CHEM181", "name": "Chemistry for Engineers 1A", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCH1TC", "name": "Technical Communication for Engineers", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENME1DR", "name": "Engineering Drawing", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH131", "name": "Mathematics 1A (Eng)", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH132", "name": "Applied Mathematics 1A (Eng)", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS151", "name": "Engineering Physics 1A", "credits": 16, "year": 1, "sem": 1, "prereqs": [], "coreqs": [{"any": ["MATH130", "MATH195"]}], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM191", "name": "Chemistry for Engineers 1B", "credits": 8, "year": 1, "sem": 2, "prereqs": [{"code": "CHEM181", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV1ED", "name": "Introduction to Civil Design", "credits": 8, "year": 1, "sem": 2, "prereqs": ["ENME1DR"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENME1EM", "name": "Introduction to Engineering Materials", "credits": 8, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH141", "name": "Mathematics 1B (Eng)", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "MATH131", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH142", "name": "Applied Mathematics 1B (Eng)", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "MATH131", "min_mark": 40}, {"code": "MATH132", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS152", "name": "Engineering Physics 1B", "credits": 16, "year": 1, "sem": 2, "prereqs": [{"code": "PHYS151", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV1EP", "name": "Engineering Practice Workshop", "credits": 0, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCV2MT", "name": "Civil Engineering Materials", "credits": 8, "year": 2, "sem": 1, "prereqs": ["ENME1EM"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SA", "name": "Structures 1", "credits": 16, "year": 2, "sem": 1, "prereqs": ["MATH141", "MATH142"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENSV2SE", "name": "Surveying Engineering", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH238", "name": "Mathematics 2A (Eng)", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"code": "MATH131", "min_mark": 50}, {"code": "MATH141", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ZULN101_OR", "name": "Basic isiZulu Language Studies (or other language)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_Y2S1", "level": 1}, {"code": "ELECTIVE_Y2S1", "name": "Elective (in place of ZULN101)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_Y2S1", "level": 2}, {"code": "ENCV2FL", "name": "Fluids 1", "credits": 8, "year": 2, "sem": 2, "prereqs": ["MATH142", {"any": ["PHYS151", "PHYS110"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2MW", "name": "Materials Workshop Course", "credits": 0, "year": 2, "sem": 2, "prereqs": ["ENCV2MT"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SB", "name": "Structures 2", "credits": 16, "year": 2, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SD", "name": "Structural Design 1", "credits": 16, "year": 2, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "GEOL215", "name": "Elements of Geology for Civil Engineers", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH248", "name": "Mathematics 2B (Eng)", "credits": 16, "year": 2, "sem": 2, "prereqs": ["MATH238", "MATH141"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3FA", "name": "Fluids 2", "credits": 16, "year": 3, "sem": 1, "prereqs": ["ENCV2FL"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G1", "name": "Geotechnical Engineering Studies 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 32, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3ST", "name": "Structures 3", "credits": 16, "year": 3, "sem": 1, "prereqs": ["ENCV2SA", "ENCV2SB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TT", "name": "Transport 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_year": 3}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "STAT370", "name": "Engineering Statistics", "credits": 8, "year": 3, "sem": 1, "prereqs": ["MATH248"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3CW", "name": "Civil CADD Workshop", "credits": 0, "year": 3, "sem": 2, "prereqs": ["ENCV3ST", "ENCV2SD"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3FB", "name": "Fluids 3", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2FL", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G2", "name": "Geotechnical Engineering Studies 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV3G1"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3SD", "name": "Structural Design 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TP", "name": "Transport 2", "credits": 8, "year": 3, "sem": 2, "prereqs": ["ENCV3G1", "ENCV3TT", "GEOL215"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3MS", "name": "Mathematical Systems", "credits": 8, "year": 3, "sem": 2, "prereqs": ["MATH238", "MATH248", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ELECTIVE_Y3S2", "name": "Elective", "credits": 8, "year": 3, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 3}, {"code": "ENCH4ML", "name": "Engineering Management & Labour Relations", "credits": 8, "year": 4, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 96, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4GS", "name": "Ground and Structural Engineering", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV3G1", "ENCV3G2", "ENCV3SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4TE", "name": "Transport and Environmental Management", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV3TT"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4WE", "name": "Water and Environmental Engineering", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2FL", "ENCV3FA", "ENCV3FB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7PP", "name": "Professional Practice", "credits": 8, "year": 4, "sem": 1, "prereqs": [{"min_year": 4}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ELECTIVE_Y4S1", "name": "Elective", "credits": 8, "year": 4, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}, {"code": "ENCV4DE", "name": "Civil Engineering Design Project", "credits": 24, "year": 4, "sem": 2, "prereqs": [{"all": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4DS", "name": "Dissertation", "credits": 24, "year": 4, "sem": 2, "prereqs": [{"all": ["CHEM181", "ENCH1TC", "ENME1DR", "MATH131", "MATH132", "PHYS151", "CHEM191", "ENCV1ED", "ENME1EM", "MATH141", "MATH142", "PHYS152", "ENCV1EP", "ENCV2MT", "ENCV2SA", "ENSV2SE", "MATH238", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "ENCV3TT", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4VW", "name": "Vacation Work", "credits": 0, "year": 4, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7CL", "name": "Management of Construction Contracts", "credits": 8, "year": 4, "sem": 2, "prereqs": [{"min_year": 4}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ELECTIVE_Y4S2", "name": "Elective", "credits": 16, "year": 4, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}]}, "ENG-CIVIL-AUG": {"code": "ENG-CIVIL-AUG", "name": "Civil Engineering (Augmented)", "stream": "augmented", "passMark": 50, "refer": [], "rules": {"concession": {"min_gpa": 55, "max_missing": 1, "prereq_floor": 45}, "electives": {"min_other_credits": 24, "required": [{"level": 4, "credits": 8, "school": "EN", "count": 1, "label": "Level-4 8-credit School of Engineering elective"}], "options": ["ACCT103", "ANTH101", "ECHS101", "ECON101", "ENEL4EB", "ENEL4EE", "ENGL102", "FREN101", "HIST104", "HIST105", "INST102", "LAWS1AS", "LING101", "LING102", "POLS101", "POLS102", "PSYC102", "RELG101", "RELG106", "SPAN102", "ZULM101", "ZULM102", "ZULM105", "ZULM106", "ZULN101", "ZULN102"]}, "timetable": {"enabled": true, "rule_id": "TTC-v1", "exempt": []}}, "progression": {"1": [0, 16, 0], "2": [32, 64, 48], "3": [56, 104, 78], "4": [96, 176, 132], "5": [144, 240, 180], "6": [192, 304, 228], "7": [240, 368, 276], "8": [288, 432, 324], "9": [336, 504, null], "10": [384, 576, null], "11": [432, null, null], "12": [480, null, null], "13": [528, null, null], "14": [576, null, null]}, "equivalences": [["MATH160", "MATH131"], ["MATH161", "MATH141"], ["PHYS160", "PHYS151"], ["PHYS163", "PHYS152"], ["ENME160", "ENME1DR"], ["ENCH160", "ENCH1TC"], ["ENAG161", "ENME1EM"], ["ENAG160", "ENCV1ED"]], "modules": [{"code": "ENME160", "name": "Augmented Engineering Drawing", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENCH160", "name": "Augmented Tech. Communication for Engineers", "credits": 8, "year": 1, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH160", "name": "Augmented Engineering Mathematics 1A", "credits": 16, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS160", "name": "Augmented Engineering Physics 1A", "credits": 16, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENAG161", "name": "Augmented Engineering Materials", "credits": 8, "year": 1, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENAG160", "name": "Augmented Engineering Design", "credits": 8, "year": 1, "sem": 2, "prereqs": [{"any": ["ENME160", "ENME1DR"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH132", "name": "Applied Mathematics 1A (Eng)", "credits": 16, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM181", "name": "Chemistry for Engineers 1A", "credits": 8, "year": 2, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ENSV2SE", "name": "Surveying Engineering", "credits": 16, "year": 2, "sem": 1, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH161", "name": "Augmented Engineering Mathematics 1B", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 40}, {"code": "MATH131", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "PHYS163", "name": "Augmented Engineering Physics 1B", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "PHYS160", "min_mark": 40}, {"code": "PHYS151", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "MATH142", "name": "Applied Mathematics 1B (Eng)", "credits": 16, "year": 2, "sem": 2, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 40}, {"code": "MATH131", "min_mark": 40}]}, {"code": "MATH132", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "CHEM191", "name": "Chemistry for Engineers 1B", "credits": 8, "year": 2, "sem": 2, "prereqs": [{"code": "CHEM181", "min_mark": 40}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 1}, {"code": "ZULN101_OR", "name": "Basic isiZulu Language Studies (or other language)", "credits": 16, "year": 2, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_AUG", "level": 1}, {"code": "ELECTIVE_AUG", "name": "Elective (in place of ZULN101)", "credits": 16, "year": 2, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": "LANG_AUG", "level": 0}, {"code": "ENCV2MT", "name": "Civil Engineering Materials", "credits": 8, "year": 3, "sem": 1, "prereqs": [{"any": ["ENAG161", "ENME1EM"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SA", "name": "Structures 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"any": ["MATH161", "MATH141"]}, "MATH142"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH238", "name": "Mathematics 2A (Eng)", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"any": [{"code": "MATH160", "min_mark": 50}, {"code": "MATH131", "min_mark": 50}]}, {"any": [{"code": "MATH161", "min_mark": 40}, {"code": "MATH141", "min_mark": 40}]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3TT", "name": "Transport 1", "credits": 16, "year": 3, "sem": 1, "prereqs": [{"min_year": 3}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV2FL", "name": "Fluids 1", "credits": 8, "year": 3, "sem": 2, "prereqs": ["MATH142", {"any": ["PHYS160", "PHYS151", "PHYS110"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2MW", "name": "Materials Workshop Course", "credits": 0, "year": 3, "sem": 2, "prereqs": ["ENCV2MT"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SB", "name": "Structures 2", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV2SD", "name": "Structural Design 1", "credits": 16, "year": 3, "sem": 2, "prereqs": ["ENCV2SA"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "GEOL215", "name": "Elements of Geology for Civil Engineers", "credits": 16, "year": 3, "sem": 2, "prereqs": [{"min_credits": 62, "level": 1}, {"min_sem": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "MATH248", "name": "Mathematics 2B (Eng)", "credits": 16, "year": 3, "sem": 2, "prereqs": ["MATH238", {"any": ["MATH161", "MATH141"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 2}, {"code": "ENCV3FA", "name": "Fluids 2", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2FL"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G1", "name": "Geotechnical Engineering Studies 1", "credits": 16, "year": 4, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 32, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3ST", "name": "Structures 3", "credits": 16, "year": 4, "sem": 1, "prereqs": ["ENCV2SA", "ENCV2SB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "STAT370", "name": "Engineering Statistics", "credits": 8, "year": 4, "sem": 1, "prereqs": ["MATH248"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ELECTIVE_Y4S1", "name": "Elective", "credits": 8, "year": 4, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 4}, {"code": "ENCV3CW", "name": "Civil CADD Workshop", "credits": 0, "year": 4, "sem": 2, "prereqs": ["ENCV3ST", "ENCV2SD"], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3FB", "name": "Fluids 3", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV2FL", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3G2", "name": "Geotechnical Engineering Studies 2", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV3G1"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3SD", "name": "Structural Design 2", "credits": 16, "year": 4, "sem": 2, "prereqs": ["ENCV2SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3TP", "name": "Transport 2", "credits": 8, "year": 4, "sem": 2, "prereqs": ["ENCV3G1", "ENCV3TT", "GEOL215"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCV3MS", "name": "Mathematical Systems", "credits": 8, "year": 4, "sem": 2, "prereqs": ["MATH238", "MATH248", "STAT370"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 3}, {"code": "ENCH4ML", "name": "Engineering Management & Labour Relations", "credits": 8, "year": 5, "sem": 1, "prereqs": [{"min_credits": 144, "level": 1}, {"min_credits": 96, "level": 2}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4GS", "name": "Ground and Structural Engineering", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV3G1", "ENCV3G2", "ENCV3SD", "ENCV3ST"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4TE", "name": "Transport and Environmental Management", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV3TT"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4WE", "name": "Water and Environmental Engineering", "credits": 16, "year": 5, "sem": 1, "prereqs": ["ENCV2FL", "ENCV3FA", "ENCV3FB"], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENPD7PP", "name": "Professional Practice", "credits": 8, "year": 5, "sem": 1, "prereqs": [{"min_year": 5}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ELECTIVE_Y5S1", "name": "Elective", "credits": 8, "year": 5, "sem": 1, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 5}, {"code": "ENCV4DE", "name": "Civil Engineering Design Project", "credits": 24, "year": 5, "sem": 2, "prereqs": [{"all": ["ENME160", "ENCH160", "MATH160", "PHYS160", "ENAG161", "ENAG160", "MATH132", "CHEM181", "ENSV2SE", "MATH161", "PHYS163", "MATH142", "CHEM191", "ENCV2MT", "ENCV2SA", "MATH238", "ENCV3TT", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4DS", "name": "Dissertation", "credits": 24, "year": 5, "sem": 2, "prereqs": [{"all": ["ENME160", "ENCH160", "MATH160", "PHYS160", "ENAG161", "ENAG160", "MATH132", "CHEM181", "ENSV2SE", "MATH161", "PHYS163", "MATH142", "CHEM191", "ENCV2MT", "ENCV2SA", "MATH238", "ENCV3TT", "ENCV2FL", "ENCV2MW", "ENCV2SB", "ENCV2SD", "GEOL215", "MATH248", "ENCV3FA", "ENCV3G1", "ENCV3ST", "STAT370", "ENCV3CW", "ENCV3FB", "ENCV3G2", "ENCV3SD", "ENCV3TP", "ENCV3MS", "ENCH4ML", "ENCV4GS", "ENCV4TE", "ENCV4WE", "ENPD7PP"]}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}, {"code": "ENCV4VW", "name": "Vacation Work", "credits": 0, "year": 5, "sem": 2, "prereqs": [], "coreqs": [], "isDp": true, "type": "prescribed", "choice": null, "level": 4}, {"code": "ELECTIVE_Y5S2", "name": "Elective", "credits": 16, "year": 5, "sem": 2, "prereqs": [], "coreqs": [], "isDp": false, "type": "elective", "choice": null, "level": 5}, {"code": "ENPD7CL", "name": "Management of Construction Contracts", "credits": 8, "year": 5, "sem": 2, "prereqs": [{"min_year": 5}], "coreqs": [], "isDp": false, "type": "prescribed", "choice": null, "level": 4}]}}, "electiveCatalogue": {"ACCT103": {"name": "Accounting 103", "credits": 16, "level": 1, "blocks": [2]}, "ANTH101": {"name": "Introduction to Anthropology", "credits": 16, "level": 1, "blocks": [1]}, "ECHS101": {"name": "Political Economy of Food in a Global Context", "credits": 16, "level": 1, "blocks": [1]}, "ECON101": {"name": "Principles of Microeconomics", "credits": 16, "level": 1, "blocks": [1]}, "ENEL4EB": {"name": "Engineering Business", "credits": 8, "level": 4, "blocks": [1, 2]}, "ENEL4EE": {"name": "Engineering Entrepreneurship", "credits": 8, "level": 4, "blocks": [1, 2]}, "ENGL102": {"name": "Introduction to English Studies B", "credits": 16, "level": 1, "blocks": [2]}, "FREN101": {"name": "French 1A: French for Beginners", "credits": 16, "level": 1, "blocks": [1]}, "HIST104": {"name": "The Making of the Modern World", "credits": 16, "level": 1, "blocks": [1]}, "HIST105": {"name": "Empires of the Modern World", "credits": 16, "level": 1, "blocks": [2]}, "INST102": {"name": "News Media in the Internet Society", "credits": 16, "level": 1, "blocks": [2]}, "LAWS1AS": {"name": "Aspects of South African Law", "credits": 16, "level": 1, "blocks": [2]}, "LING101": {"name": "Understanding Language", "credits": 16, "level": 1, "blocks": [1]}, "LING102": {"name": "Linguistics 1B: Intro to Language studies", "credits": 16, "level": 1, "blocks": [2]}, "POLS101": {"name": "Introduction to Political Science", "credits": 16, "level": 1, "blocks": [1]}, "POLS102": {"name": "Introduction to Global Politics", "credits": 16, "level": 1, "blocks": [2]}, "PSYC102": {"name": "Introduction to Psychology B", "credits": 16, "level": 1, "blocks": [2]}, "RELG101": {"name": "Introduction to Religion", "credits": 16, "level": 1, "blocks": [1]}, "RELG106": {"name": "Religion and Conflict", "credits": 16, "level": 1, "blocks": [2]}, "SPAN102": {"name": "Spanish 1B", "credits": 16, "level": 1, "blocks": [2]}, "ZULM101": {"name": "Introduction to IsiZulu A", "credits": 16, "level": 1, "blocks": [1]}, "ZULM102": {"name": "Introduction to IsiZulu B", "credits": 16, "level": 1, "blocks": [2]}, "ZULM105": {"name": "Academic Writing", "credits": 16, "level": 1, "blocks": [1, 2]}, "ZULM106": {"name": "Semiotics of African Cosmology", "credits": 16, "level": 1, "blocks": [2]}, "ZULN101": {"name": "Basic IsiZulu Language Studies A", "credits": 16, "level": 1, "blocks": [1, 2]}, "ZULN102": {"name": "Basic IsiZulu Language Studies B", "credits": 16, "level": 1, "blocks": [2]}}, "timetable": {"1": {"CHEM181": {"block": "A", "periods": ["Fri1", "Thu2"]}, "EDSJ1CS": {"block": "C", "periods": ["Tue2", "Tue3"]}, "ENCH1TC": {"block": "D", "periods": ["Mon6"]}, "ENCH4ML": {"block": "F", "periods": ["Wed5", "Wed6"]}, "ENCV2MT": {"block": "C", "periods": ["Fri4", "Thu1", "Tue2", "Tue3"]}, "ENCV2SA": {"block": "D", "periods": ["Fri7", "Mon6", "Tue4", "Tue5", "Wed1"]}, "ENCV3FA": {"block": "A", "periods": ["Fri4", "Fri5", "Thu2", "Thu3", "Tue6"]}, "ENCV3G1": {"block": "E", "periods": ["Mon4", "Mon5", "Thu7", "Tue1", "Wed2"]}, "ENCV3ST": {"block": "B", "periods": ["Fri2", "Thu4", "Thu5", "Tue11", "Tue8", "Tue9", "Wed7"]}, "ENCV3TT": {"block": "F", "periods": ["Fri3", "Mon2", "Mon3", "Wed3", "Wed4", "Wed5"]}, "ENCV4GS": {"block": "E", "periods": ["Fri8", "Fri9", "Mon4", "Mon5", "Thu7", "Tue1", "Wed2"]}, "ENCV4TE": {"block": "D", "periods": ["Fri7", "Mon6", "Tue4", "Tue5", "Wed1"]}, "ENCV4WE": {"block": "C", "periods": ["Fri4", "Mon7", "Thu1", "Thu2", "Thu3"]}, "ENEL4EE": {"block": "F", "periods": ["Mon2", "Mon3"]}, "ENME1DR": {"block": "B", "periods": ["Wed7"]}, "ENPD7PP": {"block": "F", "periods": ["Fri1", "Fri2", "Fri3", "Thu4", "Thu5", "Thu6"]}, "ENSV2SE": {"block": "B", "periods": ["Fri1", "Fri2", "Thu4", "Thu5"]}, "MATH131": {"block": "F", "periods": ["Mon2", "Mon3", "Thu6", "Tue7"]}, "MATH132": {"block": "E", "periods": ["Fri8", "Mon4", "Mon5", "Tue1"]}, "MATH238": {"block": "E", "periods": ["Mon4", "Mon5", "Tue1", "Wed2"]}, "PHYS151": {"block": "B", "periods": ["Mon1", "Thu4", "Thu5", "Tue8"]}, "STAT370": {"block": "D", "periods": ["Fri7", "Tue4", "Tue5", "Wed1"]}}, "2": {"CHEM191": {"block": "A", "periods": ["Fri1", "Thu2"]}, "ENCV1ED": {"block": "C", "periods": ["Tue2", "Tue3"]}, "ENCV2FL": {"block": "B", "periods": ["Fri2", "Thu4", "Thu5"]}, "ENCV2SB": {"block": "A", "periods": ["Fri1", "Fri5", "Thu2", "Thu3", "Tue6"]}, "ENCV2SD": {"block": "D", "periods": ["Fri7", "Mon6", "Thu8", "Thu9", "Tue4", "Tue5", "Wed1"]}, "ENCV3FB": {"block": "A", "periods": ["Fri4", "Fri5", "Thu2", "Thu3", "Tue6"]}, "ENCV3G2": {"block": "F", "periods": ["Fri3", "Mon2", "Mon3", "Wed3", "Wed4", "Wed5"]}, "ENCV3MS": {"block": "C", "periods": ["Mon7", "Thu1", "Tue2", "Tue3"]}, "ENCV3SD": {"block": "E", "periods": ["Mon4", "Mon5", "Thu7", "Tue1", "Wed2"]}, "ENCV3TP": {"block": "B", "periods": ["Fri2", "Thu4", "Thu5"]}, "ENME1EM": {"block": "E", "periods": ["Fri8", "Fri9"]}, "ENPD7CL": {"block": "D", "periods": ["Mon6", "Tue4", "Tue5", "Wed1", "Wed8", "Wed9"]}, "GEOL215": {"block": "F", "periods": ["Fri3", "Mon2", "Mon3", "Wed3", "Wed4", "Wed5"]}, "MATH141": {"block": "F", "periods": ["Mon2", "Mon3", "Thu6", "Tue7"]}, "MATH142": {"block": "E", "periods": ["Mon4", "Mon5", "Mon8", "Tue1"]}, "MATH248": {"block": "E", "periods": ["Mon4", "Mon5", "Tue1", "Wed2"]}, "PHYS152": {"block": "B", "periods": ["Mon1", "Thu4", "Thu5", "Tue8", "Tue9"]}}}, "source": "reg_advisor (submodule) \u2014 single source of truth"};
++const PARITY  = {"ENG-CIVIL": [{"marks": {}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "ENCH1TC": "can_register", "ENME1DR": "can_register", "MATH131": "can_register", "MATH132": "can_register", "PHYS151": "can_register", "ENME1EM": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "ENCV1ED": "cannot_register", "MATH141": "cannot_register", "MATH142": "cannot_register", "PHYS152": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42, "MATH132": 80, "PHYS151": 80}, "gpa": 71.55555555555556, "gpa_passed": 80.0, "buckets": {"MATH131": "can_register", "CHEM191": "can_register", "ENCV1ED": "can_register", "ENME1EM": "can_register", "MATH141": "can_register", "MATH142": "can_register", "PHYS152": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "CHEM181": "passed", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH132": "passed", "PHYS151": "passed"}}, {"marks": {"ENME1DR": 48}, "gpa": 48.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "ENCH1TC": "can_register", "ENME1DR": "can_register", "MATH131": "can_register", "MATH132": "can_register", "PHYS151": "can_register", "ENME1EM": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "ENCV1ED": "cannot_register", "MATH141": "cannot_register", "MATH142": "cannot_register", "PHYS152": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80, "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80, "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"ENCH1TC": "can_register", "ENCV1EP": "can_register", "ENCV2MT": "can_register", "MATH238": "can_register", "ENCV2FL": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENCV2SA": "timetable_clash", "CHEM181": "passed", "ENME1DR": "passed", "MATH131": "passed", "MATH132": "passed", "PHYS151": "passed", "CHEM191": "passed", "ENCV1ED": "passed", "ENME1EM": "passed", "MATH141": "passed", "MATH142": "passed", "PHYS152": "passed"}}, {"marks": {"MATH160": 70, "MATH161": 70, "PHYS160": 70, "PHYS163": 70, "ENCH160": 70, "ENME160": 70, "ENAG160": 70, "ENAG161": 70}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"CHEM181": "can_register", "MATH132": "can_register", "ENCV1EP": "can_register", "ENCV2MT": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "MATH142": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "MATH238": "timetable_clash", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH131": "passed", "PHYS151": "passed", "ENCV1ED": "passed", "ENME1EM": "passed", "MATH141": "passed", "PHYS152": "passed"}}, {"marks": {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30, "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76}, "gpa": 69.5, "gpa_passed": 77.4, "buckets": {"MATH131": "can_register", "ENCV1ED": "can_register", "ENME1EM": "can_register", "PHYS152": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "MATH142": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "CHEM181": "passed", "ENCH1TC": "passed", "ENME1DR": "passed", "MATH132": "passed", "PHYS151": "passed", "CHEM191": "passed", "MATH141": "passed"}}, {"marks": {"MATH131": 60, "ENCV3G1": 70}, "gpa": 65.0, "gpa_passed": 65.0, "buckets": {"CHEM181": "can_register", "ENCH1TC": "can_register", "ENME1DR": "can_register", "MATH132": "can_register", "PHYS151": "can_register", "ENME1EM": "can_register", "MATH141": "can_register", "ENCV1EP": "can_register", "ENCV4VW": "can_register", "CHEM191": "cannot_register", "ENCV1ED": "cannot_register", "MATH142": "cannot_register", "PHYS152": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "ENSV2SE": "cannot_register", "MATH238": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3ST": "cannot_register", "ENCV3TT": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENCV3G2": "timetable_clash", "MATH131": "passed", "ENCV3G1": "passed"}}], "ENG-CIVIL-AUG": [{"marks": {}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"ENME160": "can_register", "ENCH160": "can_register", "MATH160": "can_register", "PHYS160": "can_register", "ENAG161": "can_register", "MATH132": "can_register", "CHEM181": "can_register", "ENCV4VW": "can_register", "ENAG160": "cannot_register", "ENSV2SE": "cannot_register", "MATH161": "cannot_register", "PHYS163": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"CHEM181": 80, "ENCH1TC": 80, "ENME1DR": 80, "MATH131": 42, "MATH132": 80, "PHYS151": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"MATH160": "can_register", "ENAG161": "can_register", "ENAG160": "can_register", "MATH161": "can_register", "PHYS163": "can_register", "MATH142": "can_register", "CHEM191": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "ENCH160": "passed", "PHYS160": "passed", "MATH132": "passed", "CHEM181": "passed"}}, {"marks": {"ENME1DR": 48}, "gpa": 0.0, "gpa_passed": 0.0, "buckets": {"ENME160": "can_register", "ENCH160": "can_register", "MATH160": "can_register", "PHYS160": "can_register", "ENAG161": "can_register", "MATH132": "can_register", "CHEM181": "can_register", "ENCV4VW": "can_register", "ENAG160": "cannot_register", "ENSV2SE": "cannot_register", "MATH161": "cannot_register", "PHYS163": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register"}}, {"marks": {"MATH131": 80, "MATH132": 80, "MATH141": 80, "MATH142": 80, "PHYS151": 80, "PHYS152": 80, "CHEM181": 80, "CHEM191": 80, "ENME1DR": 80, "ENME1EM": 80, "ENCV1ED": 80}, "gpa": 80.0, "gpa_passed": 80.0, "buckets": {"ENCH160": "can_register", "ENCV2MT": "can_register", "ENCV2SA": "can_register", "MATH238": "can_register", "ENCV2FL": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "MATH160": "passed", "PHYS160": "passed", "ENAG161": "passed", "ENAG160": "passed", "MATH132": "passed", "CHEM181": "passed", "MATH161": "passed", "PHYS163": "passed", "MATH142": "passed", "CHEM191": "passed"}}, {"marks": {"MATH160": 70, "MATH161": 70, "PHYS160": 70, "PHYS163": 70, "ENCH160": 70, "ENME160": 70, "ENAG160": 70, "ENAG161": 70}, "gpa": 70.0, "gpa_passed": 70.0, "buckets": {"MATH132": "can_register", "CHEM181": "can_register", "ENCV2MT": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2SA": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "MATH238": "timetable_clash", "ENME160": "passed", "ENCH160": "passed", "MATH160": "passed", "PHYS160": "passed", "ENAG161": "passed", "ENAG160": "passed", "MATH161": "passed", "PHYS163": "passed"}}, {"marks": {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30, "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76}, "gpa": 77.5, "gpa_passed": 77.5, "buckets": {"MATH160": "can_register", "ENAG161": "can_register", "ENAG160": "can_register", "PHYS163": "can_register", "ENCV4VW": "can_register", "ENSV2SE": "cannot_register", "MATH142": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3G1": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3G2": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "ENME160": "passed", "ENCH160": "passed", "PHYS160": "passed", "MATH132": "passed", "CHEM181": "passed", "MATH161": "passed", "CHEM191": "passed"}}, {"marks": {"MATH131": 60, "ENCV3G1": 70}, "gpa": 70.0, "gpa_passed": 70.0, "buckets": {"ENME160": "can_register", "ENCH160": "can_register", "PHYS160": "can_register", "ENAG161": "can_register", "MATH132": "can_register", "CHEM181": "can_register", "MATH161": "can_register", "ENCV3G2": "can_register", "ENCV4VW": "can_register", "ENAG160": "cannot_register", "ENSV2SE": "cannot_register", "PHYS163": "cannot_register", "MATH142": "cannot_register", "CHEM191": "cannot_register", "ENCV2MT": "cannot_register", "ENCV2SA": "cannot_register", "MATH238": "cannot_register", "ENCV3TT": "cannot_register", "ENCV2FL": "cannot_register", "ENCV2MW": "cannot_register", "ENCV2SB": "cannot_register", "ENCV2SD": "cannot_register", "GEOL215": "cannot_register", "MATH248": "cannot_register", "ENCV3FA": "cannot_register", "ENCV3ST": "cannot_register", "STAT370": "cannot_register", "ENCV3CW": "cannot_register", "ENCV3FB": "cannot_register", "ENCV3SD": "cannot_register", "ENCV3TP": "cannot_register", "ENCV3MS": "cannot_register", "ENCH4ML": "cannot_register", "ENCV4GS": "cannot_register", "ENCV4TE": "cannot_register", "ENCV4WE": "cannot_register", "ENPD7PP": "cannot_register", "ENCV4DE": "cannot_register", "ENCV4DS": "cannot_register", "ENPD7CL": "cannot_register", "MATH160": "passed", "ENCV3G1": "passed"}}]};
+ 
+ /* ---------------------------- state ------------------------------- */
+ let progCode = Object.keys(PAYLOAD.programmes)[0];
+@@ -730,7 +849,8 @@ const VERDICT = {
+   can_register:        {elig:"may",        tag:"MAY",        may:true},
+   concession_possible: {elig:"concession", tag:"CONCESSION", may:false},
+   needs_review:        {elig:"review",     tag:"REVIEW",     may:false},
+-  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false}
++  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false},
++  timetable_clash:     {elig:"clash",      tag:"CLASH",      may:false}
+ };
+ 
+ /* build reg_advisor's transcript index from entered marks, then overlay the
+@@ -848,12 +968,21 @@ function bandCredits(sem, t){
+ const sheet = document.getElementById("sheet");
+ const M = () => modMap();
+ 
++/* Every module's verdict for one transcript index, computed once. The clash
++   rule (TTC-v1) is a property of the whole set -- a module gives way only to
++   another the student may also register -- so verdicts are worked out
++   together, as reg_advisor's eval_advice does, then read one at a time. */
++const ADVICE = new WeakMap();
++function adviceFor(t){
++  if(!ADVICE.has(t)) ADVICE.set(t, RA.adviseAll(prog().modules, t, rules(), PAYLOAD.timetable));
++  return ADVICE.get(t);
++}
+ function eligOf(code, t){
+   const m = M()[code];
+   if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective")
+     return {verdict:"elective", elig:"may", tag:"ELECTIVE", pc:{missing:[],unmet:[]}, repeat:false};
+-  const r = RA.verdictFor(m, t, rules());
+-  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat};
++  const r = adviceFor(t)[code];
++  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat, clash:r.clash};
+ }
+ 
+ function render(){
+@@ -909,7 +1038,8 @@ function render(){
+       if(e.verdict === "can_register" && !e.repeat) may++;
+       else if(e.verdict === "can_register" && e.repeat) must++;
+       else if(e.verdict === "concession_possible") conc++;
+-      else if(e.verdict === "cannot_register" || e.verdict === "needs_review") blocked++;
++      else if(e.verdict === "cannot_register" || e.verdict === "needs_review"
++              || e.verdict === "timetable_clash") blocked++;
+ 
+       const mk = marks[code];
+       const st = mk == null ? "none" : (mk >= passMark() ? "passed" : "failed");
+@@ -923,7 +1053,8 @@ function render(){
+       b.dataset.kind = m.isDp ? "dp" : (m.type === "elective" ? "elective" : "degree");
+       if(m.choice) b.dataset.choice = m.choice;
+       if(code === selected) b.classList.add("selected");
+-      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review");
++      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review"
++                                          ||e.verdict==="timetable_clash");
+       if(hidden) b.classList.add("dim");
+       const tag = m.isDp ? "DP"
+         : m.type === "elective" ? (pickOf(code) ? "CHOSEN" : "CHOOSE")
+@@ -1026,7 +1157,8 @@ function renderInspector(t){
+   }
+   const m = M()[selected];
+   const e = eligOf(selected, t);
+-  const reasons = (e.pc && e.pc.unmet) ? e.pc.unmet : [];
++  const reasons = e.verdict === "timetable_clash" ? []
++                : (e.pc && e.pc.unmet) ? e.pc.unmet : [];
+   const dependents = prog().modules
+     .filter(mm => JSON.stringify(mm.prereqs||"").includes(`"${selected}"`))
+     .map(mm => mm.code);
+@@ -1042,6 +1174,14 @@ function renderInspector(t){
+                            ? ["Talk to your coordinator",
+                               "Registration for this module is arranged with the Programme Coordinator. The tool shows what is still outstanding, but it does not make the final call — take your record to the coordinator before you register."]
+                            : ["Blocked", "You can't register yet — these prerequisites are outstanding:"],
++    timetable_clash:     e.clash
++                           ? ["Timetable clash",
++                              `${selected} meets at the same time as ${e.clash.with.join(", ")} `
++                              + `(block ${e.clash.block || "?"}: ${e.clash.periods.join(" ")}). `
++                              + `You meet the prerequisites for both, but the rule is to take the `
++                              + `lower-level module first: register ${e.clash.with.join(", ")} and `
++                              + `leave ${selected} for when it no longer clashes.`]
++                           : ["Timetable clash", ""],
+     elective:            ["Elective", "Take it in any semester; any module matching this bucket counts."]
+   }[e.verdict];
+ 
+@@ -1104,13 +1244,15 @@ function drawLeaders(){
+   if(!selected) return;
+   const t = tx();
+   const e = eligOf(selected, t);
+-  if(e.verdict !== "cannot_register") return;
++  if(e.verdict !== "cannot_register" && e.verdict !== "timetable_clash") return;
+   const wrap = document.querySelector(".sheet-wrap").getBoundingClientRect();
+   const from = document.querySelector(`.cell[data-code="${selected}"]`);
+   if(!from) return;
+   const f = from.getBoundingClientRect();
+   const x1 = f.left - wrap.left + f.width/2, y1 = f.top - wrap.top;
+-  for(const ref of new Set((e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">")))){
++  const refs = e.verdict === "timetable_clash" ? (e.clash ? e.clash.with : [])
++    : (e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">"));
++  for(const ref of new Set(refs)){
+     const to = document.querySelector(`.cell[data-code="${ref}"]`);
+     if(!to) continue;
+     to.classList.add("culprit");
+@@ -1144,6 +1286,7 @@ const OUTCOME = {
+   concession_possible: "Concession possible",
+   needs_review:        "Review — see coordinator",
+   cannot_register:     "Blocked",
++  timetable_clash:     "Timetable clash — take the lower level first",
+   elective:            "Elective — choose"
+ };
+ 
+@@ -1255,6 +1398,7 @@ function buildPrintout(t){
+   const planConc  = planned.filter(x => x.e.verdict === "concession_possible");
+   const planStop  = planned.filter(x => x.e.verdict === "cannot_register"
+                                      || x.e.verdict === "needs_review"
++                                     || x.e.verdict === "timetable_clash"
+                                      || x.e.verdict === "passed");
+   const planCr    = plannedCredits();
+   const normal    = normalLoadNext();
+@@ -1268,7 +1412,8 @@ function buildPrintout(t){
+   const blocked = [];
+   for(const sem of orderedSems()) for(const code of sem.modules){
+     const e = eligOf(code, t);
+-    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"))
++    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"
++                           || e.verdict === "timetable_clash"))
+       blocked.push({code, m:mm[code], e, sem});
+   }
+ 
+@@ -1276,7 +1421,8 @@ function buildPrintout(t){
+   /* Reasons come back as raw expressions. The capstone gate's reason names every
+      core module, so clip anything longer than a line an adviser would read. */
+   const clip = s => { s = String(s); return s.length > 110 ? s.slice(0,107) + "…" : s; };
+-  const why    = e => (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
++  const why    = e => e.clash ? clip(e.clash.reason)
++                    : (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
+                     : (e.pc && e.pc.missing && e.pc.missing.length)
+                         ? clip("outstanding: " + e.pc.missing.join(", "))
+                     : "—";
+@@ -1373,7 +1519,7 @@ function buildPrintout(t){
+           eligible.map(listRow).join("")}</tbody></table>`
+       : `<p class="none">None.</p>`)}
+ 
+-  ${blocked.length ? section("E · Blocked — outstanding prerequisites",
++  ${blocked.length ? section("E · Blocked — outstanding prerequisites or a timetable clash",
+     `<table>${head("Code","Module","Cr","Slot","Outstanding")}<tbody>${
+       blocked.slice(0,14).map(listRow).join("")}</tbody></table>`
+      + (blocked.some(e => isReferred(e.code))
+@@ -1395,9 +1541,10 @@ function buildPrintout(t){
+     <div class="notes"><span class="lb">Adviser notes / amendments</span><div class="notebox"></div></div>
+   </div>
+ 
+-  <p class="print-note">Scope: prerequisites and cumulative progression credits only.
+-    This record does not apply term decisions, ERS academic standing, credit caps or timetable
+-    clashes, and it is not a registration. Final registration is subject to Faculty approval.
++  <p class="print-note">Scope: prerequisites, cumulative progression credits and timetable
++    clashes (where two modules meet at the same time, the lower level is taken first).
++    This record does not apply term decisions, ERS academic standing or credit caps, and it
++    is not a registration. Final registration is subject to Faculty approval.
+     Produced by the CE registration advisory explorer · ${esc(date)}.</p>`;
+ }
+ 
+@@ -1458,12 +1605,12 @@ document.getElementById("print").addEventListener("click", () => window.print())
+     const mm = {}; p.modules.forEach(x=>mm[x.code]=x);
+     for(const c of cases){
+       const t = RA.indexMarks(c.marks, mm, p.passMark ?? 50, p.equivalences, 7);
++      const adv = RA.adviseAll(p.modules, t, p.rules||{}, PAYLOAD.timetable);
+       for(const m of p.modules){
+         if(m.type==="elective"||m.type==="free_elective"||m.type==="core_elective") continue;
+         total++;
+-        const r = RA.verdictFor(m, t, p.rules||{});
+         const want = c.buckets[m.code] || "cannot_register";
+-        if(r.verdict === want) pass++;
++        if(adv[m.code].verdict === want) pass++;
+       }
+     }
+   }
+diff --git a/programmes/augmented_civil.yaml b/programmes/augmented_civil.yaml
+index af9c0a8..1ac74b5 100644
+--- a/programmes/augmented_civil.yaml
++++ b/programmes/augmented_civil.yaml
+@@ -123,6 +123,18 @@ rules:
+     single_miss_only: true
+     allowed_standings: [green, orange]
+     rule_id: CAC-v1
++  # Timetable clashes (TTC-v1). Two modules that share a lecture period on the
++  # School timetable (catalogue/timetable.yaml) cannot both be registered: the
++  # student deregisters the HIGHER-level module and takes the LOWER-level one.
++  # Surfaced by GEOL215 (L2) and ENCV3G2 (L3), both block F in semester 2.
++  # `exempt` lists modules whose clashes are not enforced -- e.g. a service
++  # module the student can attend in another lecture stream. Each entry should
++  # carry its reason in a comment. Empty = the rule applies to every module the
++  # grid places. -- Justin Pringle 2026-10-21
++  timetable:
++    enabled: true
++    exempt: []
++    rule_id: TTC-v1
+   credit_cap:
+     green: null
+     orange: null
+diff --git a/programmes/civil.yaml b/programmes/civil.yaml
+index 527a62f..56c891e 100644
+--- a/programmes/civil.yaml
++++ b/programmes/civil.yaml
+@@ -96,6 +96,19 @@ rules:
+     probation_statuses: [red]
+     completion_reduces: true
+ 
++  # Timetable clashes (TTC-v1). Two modules that share a lecture period on the
++  # School timetable (catalogue/timetable.yaml) cannot both be registered: the
++  # student deregisters the HIGHER-level module and takes the LOWER-level one.
++  # Surfaced by GEOL215 (L2) and ENCV3G2 (L3), both block F in semester 2.
++  # `exempt` lists modules whose clashes are not enforced -- e.g. a service
++  # module the student can attend in another lecture stream. Each entry should
++  # carry its reason in a comment. Empty = the rule applies to every module the
++  # grid places. -- Justin Pringle 2026-10-21
++  timetable:
++    enabled: true
++    exempt: []
++    rule_id: TTC-v1
++
+   # DEPRECATED. Every entry is null: green, orange and red are uncapped.
+   # Kept only so ers_credit_cap() has something to read until its callers move
+   # to rules.load. Delete with the function.
+diff --git a/scripts/_ra/README.md b/scripts/_ra/README.md
+index 0be6bd6..b2af814 100644
+--- a/scripts/_ra/README.md
++++ b/scripts/_ra/README.md
+@@ -13,6 +13,7 @@ this folder and are covered by the same lock:
+ | `scripts/_ra/programme_loader.py` | `scripts/programme_loader.py` |
+ | `scripts/_ra/regadvisor_engine.py` | `scripts/regadvisor_engine.py` |
+ | `catalogue/modules.yaml` | `catalogue/modules.yaml` |
++| `catalogue/timetable.yaml` | `catalogue/timetable.yaml` |
+ | `programmes/civil.yaml` | `programmes/civil.yaml` |
+ | `programmes/augmented_civil.yaml` | `programmes/augmented_civil.yaml` |
+ 
+@@ -33,3 +34,10 @@ and level; the programme YAMLs state only where a module sits and what gates it.
+ `build_explorer.py` passes the path explicitly and refuses to build if the file
+ is absent — the loader's own fallback is silent, and a silent fallback here
+ would put zero-credit modules on a student-facing page.
++
++`catalogue/timetable.yaml` is generated upstream from the School's semester
++timetable grids by `scripts/build_timetable.py`. It drives the timetable clash
++rule (TTC-v1). `build_explorer.py` passes its path explicitly too and refuses
++to build without it: a missing timetable means no clash can be shown, and the
++page would silently advise students to register two modules that meet at the
++same time.
+diff --git a/scripts/_ra/VENDOR.lock b/scripts/_ra/VENDOR.lock
+index c437676..badaefb 100644
+--- a/scripts/_ra/VENDOR.lock
++++ b/scripts/_ra/VENDOR.lock
+@@ -1,26 +1,30 @@
+ {
+   "branch": "backend_dev",
+-  "commit": "d07fa15dcf7a187dfbfcab7e32eef16eaacc282e",
++  "commit": "b91a9d3dfc807d1a83711989a256ab71dd8def6f",
+   "files": {
+     "catalogue/modules.yaml": {
+       "from": "catalogue/modules.yaml",
+       "sha256": "4d38a5ccdb9dba74e459ce8834a1cf72a0bd3065940ec389e62025bcaa749183"
+     },
++    "catalogue/timetable.yaml": {
++      "from": "catalogue/timetable.yaml",
++      "sha256": "db32eb073017c2357e7f946a45a5a6856ead31bcc859e9624bee126bf28975aa"
++    },
+     "programmes/augmented_civil.yaml": {
+       "from": "programmes/augmented_civil.yaml",
+-      "sha256": "9b8b6311dc3ec8e69e310fb8c4c4829b5fd71a58e6e12df61e261001f9a23422"
++      "sha256": "8e6277f828cfb3499eecb96f5b4ce38cd979cdfbb0aaaeaf4819aa6560a528ce"
+     },
+     "programmes/civil.yaml": {
+       "from": "programmes/civil.yaml",
+-      "sha256": "e4881ec86c9895b96d5868078aee98669649d33c9107c25db793c1d36b3c44de"
++      "sha256": "a3da239ef007bcd6ec48e37c0da1ca6f23eef09d55c2f100b1495ac4e68389e1"
+     },
+     "scripts/_ra/programme_loader.py": {
+       "from": "scripts/programme_loader.py",
+-      "sha256": "0d54ae1e59f22cc24700c3cdd86b81eb319276ce07455b6ab5b4de573a9884c2"
++      "sha256": "8ac59a39b8ba65f4c409370589e179be4080c8132c33fffa17971d805e4797a8"
+     },
+     "scripts/_ra/regadvisor_engine.py": {
+       "from": "scripts/regadvisor_engine.py",
+-      "sha256": "f8878519b9a79a522b6e060fee6a0bb63b9fb596a40a1ea6922bfbaddb5b9055"
++      "sha256": "8e4eb13b732e91a38e1074fa2cc80bdae22ea97a0cd2859b5e53df53f67f391d"
+     }
+   },
+   "upstream": "/Users/justinpringle/Developer/reg_advisor"
+diff --git a/scripts/_ra/programme_loader.py b/scripts/_ra/programme_loader.py
+index 02321aa..462ffc6 100644
+--- a/scripts/_ra/programme_loader.py
++++ b/scripts/_ra/programme_loader.py
+@@ -29,6 +29,9 @@ from regadvisor_engine import prereq_codes
+ DEFAULT_CATALOGUE = os.path.join(
+     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+     "catalogue", "modules.yaml")
++# The School timetable as lecture periods per module, built from the semester
++# grids by scripts/build_timetable.py. Read for the clash rule (TTC-v1).
++DEFAULT_TIMETABLE = os.path.join(os.path.dirname(DEFAULT_CATALOGUE), "timetable.yaml")
+ 
+ # Each prereq DICT must match exactly one of these key-sets. Anything else is an
+ # authoring slip (a typo like `min_creditz`) the validator reports as an error.
+@@ -83,6 +86,10 @@ DEFAULT_RULES: dict[str, Any] = {
+         "probation_statuses": ["red"],
+         "completion_reduces": True,   # degree completes -> reduced, on PC sign-off
+     },
++    "timetable": {           # regadvisor_engine.apply_timetable -- TTC-v1
++        "enabled": True,     # a clash drops the higher-level module
++        "rule_id": "TTC-v1",
++    },
+     "credit_cap": {          # DEPRECATED -- no standing is capped; see "load"
+         "green": None, "orange": None, "red": None, "exclude": 0,
+         "ERS-ORANGE-FIRSTSEM": None, "ERS-ORANGE-CUMUL": None, "ERS-ORANGE-SEM": None,
+@@ -115,6 +122,23 @@ def load_catalogue(path: str | None = None) -> dict[str, dict[str, Any]]:
+     return {str(k): dict(v or {}) for k, v in (raw.get("modules") or {}).items()}
+ 
+ 
++def load_timetable(path: str | None = None) -> dict[int, dict[str, dict[str, Any]]]:
++    """Read timetable.yaml into {sem: {code: {"block", "periods": set}}}. A
++    missing file is not an error: no timetable means no clash can be shown, and
++    the advice is exactly what it was before the rule existed."""
++    path = path or DEFAULT_TIMETABLE
++    if not os.path.exists(path):
++        return {}
++    with open(path, encoding="utf-8") as fh:
++        raw = yaml.safe_load(fh) or {}
++    out: dict[int, dict[str, dict[str, Any]]] = {}
++    for sem, mods in (raw.get("semesters") or {}).items():
++        out[int(sem)] = {str(c): {"block": (v or {}).get("block"),
++                                  "periods": set((v or {}).get("periods") or [])}
++                         for c, v in (mods or {}).items()}
++    return out
++
++
+ def _read_overrides(raw: Any) -> dict[tuple[str, str], dict[str, Any]]:
+     """Index a catalogue_overrides block by (code, field). Malformed entries are
+     dropped here and reported by validate_programme, never applied blind."""
+@@ -130,16 +154,20 @@ def _read_overrides(raw: Any) -> dict[tuple[str, str], dict[str, Any]]:
+ 
+ # --- Load -------------------------------------------------------------------
+ def load_programme(path: str, validate: bool = True, strict: bool = True,
+-                   catalogue: dict[str, dict[str, Any]] | str | None = None
++                   catalogue: dict[str, dict[str, Any]] | str | None = None,
++                   timetable: dict[int, dict[str, dict[str, Any]]] | str | None = None
+                    ) -> dict[str, Any]:
+     """Read an authored programme file into the engine's curriculum shape.
+ 
+     validate:  run validate_programme and print its warnings.
+     strict:    raise ValueError if validation reports any errors.
+     catalogue: a loaded catalogue, a path to one, or None for the default.
++    timetable: a loaded timetable, a path to one, or None for the default.
+     """
+     if catalogue is None or isinstance(catalogue, str):
+         catalogue = load_catalogue(catalogue)
++    if timetable is None or isinstance(timetable, str):
++        timetable = load_timetable(timetable)
+     with open(path, encoding="utf-8") as fh:
+         raw = yaml.safe_load(fh) or {}
+ 
+@@ -203,7 +231,8 @@ def load_programme(path: str, validate: bool = True, strict: bool = True,
+            "rules": merge_rules(raw.get("rules")),
+            "external_prereqs": sorted(set(external)),
+            "equivalences": equivalences, "twins": twins,
+-           "catalogue": catalogue, "catalogue_overrides": overrides}
++           "catalogue": catalogue, "catalogue_overrides": overrides,
++           "timetable": timetable}
+     # cur = {"programme": prog, "modules": modules, "elective_groups": {},
+     #        "rules": merge_rules(raw.get("rules"))}
+ 
+@@ -475,6 +504,17 @@ def validate_programme(cur: dict[str, Any]) -> dict[str, list[str]]:
+             warnings.append(f"year_credits sums to {sum(want.values()):.0f}, "
+                             f"programme.total_credits says {prog_total:.0f}")
+ 
++    # The clash rule looks a module up in the semester the programme puts it in.
++    # A timetable that places it only in the OTHER semester means one of the two
++    # is wrong, and the module would silently escape the clash check.
++    tt = cur.get("timetable") or {}
++    for code, m in codes.items():
++        sems = sorted(s for s, mods in tt.items() if code in mods)
++        if sems and m.get("sem") not in sems:
++            warnings.append(f"{code}: programme says semester {m.get('sem')}, the "
++                            f"timetable places it in semester {sems[0]} -- the clash "
++                            f"rule will not see it")
++
+     cyc = _find_cycle(codes)
+     if cyc:
+         errors.append("prerequisite cycle among " + ", ".join(cyc))
+diff --git a/scripts/_ra/regadvisor_engine.py b/scripts/_ra/regadvisor_engine.py
+index 097314a..09a75b3 100644
+--- a/scripts/_ra/regadvisor_engine.py
++++ b/scripts/_ra/regadvisor_engine.py
+@@ -286,6 +286,150 @@ def check_prereqs(mod: dict[str, Any], tx: dict[str, Any]) -> dict[str, Any]:
+                            if not str(r["label"]).startswith("[review"))}
+ 
+ 
++# --- Timetable clashes: TTC-v1 ------------------------------------------------
++# Programme rule: a student may not register two modules that meet at the same
++# time. Where two clash, the student deregisters the HIGHER-level module and
++# takes the LOWER-level one -- clear the backlog before moving up. GEOL215 (L2)
++# and ENCV3G2 (L3), both block F in semester 2, surfaced the rule.
++#
++# The timetable is data (catalogue/timetable.yaml, built from the School grid by
++# build_timetable.py): {sem: {code: {"block": "F", "periods": {"Mon2", ...}}}}.
++# Two modules clash when they share a period. A module the timetable does not
++# place cannot be shown to clash, so it is never dropped on a guess.
++DEFAULT_TIMETABLE_RULE: dict[str, Any] = {"enabled": True, "exempt": [], "rule_id": "TTC-v1"}
++
++
++def clash_timetable(curriculum: dict[str, Any] | None
++                    ) -> tuple[dict[Any, Any], dict[str, Any]]:
++    """(timetable the rule enforces, merged rule). The one place the rule is
++    read, so the advice, the COC check and the cohort audit cannot disagree.
++
++    `exempt` names modules whose clashes are not enforced -- a module the
++    grid places, but which the student can take at another time (a service
++    module with a second lecture stream, say). An exempt module is taken out of
++    the timetable, so it neither drops nor is dropped. Disabled rule -> {}."""
++    cur = curriculum or {}
++    rule = {**DEFAULT_TIMETABLE_RULE, **((cur.get("rules") or {}).get("timetable") or {})}
++    tt = cur.get("timetable") or {}
++    if not tt or not rule.get("enabled"):
++        return {}, rule
++    skip = {str(c) for c in rule.get("exempt") or []}
++    if skip:
++        tt = {s: {c: v for c, v in mods.items() if c not in skip} for s, mods in tt.items()}
++    return tt, rule
++
++
++def module_level(curriculum: dict[str, Any] | None, code: str) -> int:
++    """A module's level: the programme's authored value, then the catalogue's
++    (which carries the ITS level overrides), then the first digit of the code."""
++    cur = curriculum or {}
++    for m in cur.get("modules", []):
++        if m.get("code") == code and isinstance(m.get("level"), int):
++            return m["level"]
++    lv = ((cur.get("catalogue") or {}).get(code) or {}).get("level")
++    return lv if isinstance(lv, int) else code_level(code)
++
++
++_DAY = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4}
++
++
++def _periods(ps: Any) -> list[str]:
++    """Periods in timetable order -- Mon1 .. Fri11 -- for messages."""
++    return sorted(ps, key=lambda p: (_DAY.get(str(p)[:3], 9), int(str(p)[3:] or 0)))
++
++
++def find_clashes(codes: Any, sem: int, timetable: dict[Any, Any] | None,
++                 level_of: Any = code_level) -> dict[str, Any]:
++    """Resolve one semester's basket against the timetable.
++
++    Modules are taken lowest level first. Each is kept unless it shares a
++    period with a module already kept, in which case it is dropped -- the lower
++    level stays, the higher goes. Two clashing modules at the SAME level are a
++    tie: the rule cannot choose, so neither is dropped and the tie goes to a
++    person. Taking the lowest level first also means a module dropped for a
++    clash never knocks out a third one it alone would have collided with.
++    -> {keep:[code], drop:[{code, with:[code], block, periods:[p]}],
++        ties:[{codes:[a, b], block, periods:[p]}]}
++    """
++    slots = (timetable or {}).get(sem) or (timetable or {}).get(str(sem)) or {}
++    placed = [c for c in dict.fromkeys(codes) if c in slots]
++    order = sorted(placed, key=lambda c: (level_of(c), c))
++    keep: list[str] = []
++    drop: list[dict[str, Any]] = []
++    ties: list[dict[str, Any]] = []
++    for c in order:
++        mine = set(slots[c]["periods"])
++        hits = [k for k in keep if mine & set(slots[k]["periods"])]
++        lower = [k for k in hits if level_of(k) < level_of(c)]
++        if lower:
++            shared = _periods({p for k in lower for p in mine & set(slots[k]["periods"])})
++            drop.append({"code": c, "with": lower, "block": slots[c].get("block"),
++                         "periods": shared})
++            continue
++        for k in hits:                       # same level: a tie, keep both
++            ties.append({"codes": [k, c], "block": slots[c].get("block"),
++                         "periods": _periods(mine & set(slots[k]["periods"]))})
++        keep.append(c)
++    return {"keep": keep, "drop": drop, "ties": ties}
++
++
++def clash_reason(d: dict[str, Any], rule_id: str = "TTC-v1") -> str:
++    """One line for a dropped module -- or, with `tie`, a same-level clash --
++    for the page, the COC check and the CSV."""
++    if d.get("tie"):
++        return (f"timetable clash at the same level with {', '.join(d['with'])} "
++                f"({' '.join(d['periods'])}): needs a person [{rule_id}]")
++    return (f"timetable clash with {', '.join(d['with'])} (block {d.get('block') or '?'}, "
++            f"{' '.join(d['periods'])}): take the lower-level "
++            f"{', '.join(d['with'])} first, deregister {d['code']} [{rule_id}]")
++
++
++def apply_timetable(curriculum: dict[str, Any], out: dict[str, list[dict[str, Any]]]
++                    ) -> dict[str, list[dict[str, Any]]]:
++    """Move the higher-level module of every clash out of the registrable
++    buckets into `timetable_clash`, and send equal-level clashes to review.
++
++    The basket is everything the student may end up registering this year:
++    can_register, concession_possible and needs_review. A blocked module will
++    not be registered, so it displaces nothing."""
++    tt, rule = clash_timetable(curriculum)
++    out.setdefault("timetable_clash", [])
++    if not tt:
++        return out
++    live = ("can_register", "concession_possible", "needs_review")
++    where = {r["code"]: b for b in live for r in out[b]}
++    level = lambda c: module_level(curriculum, c)
++    by_sem: dict[int, list[str]] = {}
++    for b in live:
++        for r in out[b]:
++            if isinstance(r.get("sem"), int):
++                by_sem.setdefault(r["sem"], []).append(r["code"])
++    for sem, codes in sorted(by_sem.items()):
++        res = find_clashes(codes, sem, tt, level)
++        for d in res["drop"]:
++            b = where[d["code"]]
++            row = next(r for r in out[b] if r["code"] == d["code"])
++            out[b].remove(row)
++            out["timetable_clash"].append({**row, "clash": {
++                **d, "sem": sem, "was": b, "rule_id": rule["rule_id"],
++                "reason": clash_reason(d, rule["rule_id"])}})
++        for t in res["ties"]:
++            for code in t["codes"]:
++                b = where[code]
++                row = next((r for r in out[b] if r["code"] == code), None)
++                if row is None:
++                    continue
++                tie = {**t, "code": code, "with": [x for x in t["codes"] if x != code],
++                       "tie": True}
++                row["clash"] = {**tie, "sem": sem, "rule_id": rule["rule_id"],
++                                "reason": clash_reason(tie, rule["rule_id"])}
++                if b != "needs_review":
++                    out[b].remove(row)
++                    out["needs_review"].append(row)
++                    where[code] = "needs_review"
++    return out
++
++
+ # --- Finalist route: can this student complete the degree this year? ---------
+ # Distinct from a concession. A concession asks "did you nearly pass the
+ # prerequisite"; the finalist route asks "if you register the capstones now,
+@@ -413,6 +557,8 @@ def eval_advice(curriculum: dict[str, Any], tx: dict[str, Any],
+     cannot_register     : blocked
+     repeat_needed       : attempted before (overlay flag; a course can be both
+                           repeat_needed and one of the three above)
++    timetable_clash     : registrable, but meets at the same time as a lower-level
++                          module the student must take first (TTC-v1)
+     passed              : already done
+     """
+     c = (curriculum.get("rules") or {}).get("concession") or {}
+@@ -423,7 +569,7 @@ def eval_advice(curriculum: dict[str, Any], tx: dict[str, Any],
+     if concession_floor is None:
+         concession_floor = c.get("prereq_floor", 45)
+     out = {"can_register": [], "concession_possible": [], "cannot_register": [],
+-           "needs_review": [], "repeat_needed": [], "passed": []}
++           "needs_review": [], "timetable_clash": [], "repeat_needed": [], "passed": []}
+     for mod in curriculum.get("modules", []):
+         if mod.get("type") in ("free_elective", "core_elective", "elective"):
+             continue
+@@ -457,7 +603,7 @@ def eval_advice(curriculum: dict[str, Any], tx: dict[str, Any],
+             out["concession_possible"].append(row)
+         else:
+             out["cannot_register"].append(row)
+-    return out
++    return apply_timetable(curriculum, out)
+ 
+ 
+ # --- Curricular-analytics extras --------------------------------------------
+diff --git a/scripts/build_explorer.py b/scripts/build_explorer.py
+index fa07bc8..c9aed76 100644
+--- a/scripts/build_explorer.py
++++ b/scripts/build_explorer.py
+@@ -42,6 +42,11 @@ ENGINE_JS = Path(__file__).with_name("ra_engine.js")
+ # or zero where the programme file no longer states them. Absent catalogue is a
+ # build failure here, not a degraded page.
+ CATALOGUE = ROOT / "catalogue" / "modules.yaml"
++# The lecture timetable (periods per module per semester), generated upstream by
++# reg_advisor's scripts/build_timetable.py and vendored beside the catalogue.
++# Passed explicitly for the same reason: the loader's default would miss it, and
++# a missing timetable is silent -- the clash rule would simply never fire.
++TIMETABLE = ROOT / "catalogue" / "timetable.yaml"
+ 
+ PROFILES = [
+     {},
+@@ -60,6 +65,10 @@ PROFILES = [
+     # concession gate.
+     {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30,
+      "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76},
++    # Timetable clash (TTC-v1). MATH141 (L1) is still outstanding and open, and
++    # ENCV3G1 is passed, so ENCV3G2 (L3) is open too -- both meet in block F in
++    # semester 2, and the higher level must give way.
++    {"MATH131": 60, "ENCV3G1": 70},
+ ]
+ 
+ 
+@@ -78,7 +87,9 @@ def programme_payload(cur: dict) -> dict:
+             "isDp": bool(m.get("is_dp")),
+             "type": m.get("type", "prescribed"),
+             "choice": m.get("choice") or None,
+-            "level": eng.code_level(m["code"]),
++            # The engine's level, not the code's first digit: the clash rule
++            # keeps the lower level, so the page must rank modules as it does.
++            "level": eng.module_level(cur, m["code"]),
+         }
+         for m in cur.get("modules", [])
+     ]
+@@ -99,7 +110,8 @@ def programme_payload(cur: dict) -> dict:
+         # that replaced it is a coordinator decision (it depends on the
+         # completion route), so the page does not carry it either.
+         "rules": {"concession": (rules.get("concession") or {}),
+-                  "electives": (rules.get("electives") or {})},
++                  "electives": (rules.get("electives") or {}),
++                  "timetable": (rules.get("timetable") or {})},
+         "progression": progression,
+         "equivalences": equivalences,
+         "modules": modules,
+@@ -125,7 +137,7 @@ def parity_for(cur: dict) -> list[dict]:
+         adv = eng.eval_advice(cur, tx)
+         buckets = {}
+         for bucket in ("can_register", "concession_possible", "cannot_register",
+-                       "needs_review", "passed"):
++                       "needs_review", "timetable_clash", "passed"):
+             for m in adv[bucket]:
+                 buckets[m["code"]] = bucket
+         cases.append({"marks": prof, "gpa": tx["gpa"],
+@@ -145,10 +157,16 @@ def main(argv: list[str]) -> int:
+         sys.exit(f"module catalogue not found at {CATALOGUE}\n"
+                  f"Copy it from reg_advisor (catalogue/modules.yaml) — the "
+                  f"programme YAMLs no longer carry module facts of their own.")
++    if not TIMETABLE.exists():
++        sys.exit(f"timetable not found at {TIMETABLE}\n"
++                 f"Run scripts/vendor_sync.py — without it the page would advise "
++                 f"students to register modules that meet at the same time.")
+ 
+     # Mainstream first: the page opens on the first key, and alphabetical file
+     # order would otherwise land every student on the augmented programme.
+-    loaded = [(y, pl.load_programme(str(y), catalogue=str(CATALOGUE))) for y in yamls]
++    timetable = pl.load_timetable(str(TIMETABLE))
++    loaded = [(y, pl.load_programme(str(y), catalogue=str(CATALOGUE), timetable=timetable))
++              for y in yamls]
+     loaded.sort(key=lambda pair: (
+         "augment" in (pair[1].get("programme", {}).get("name", "").lower()),
+         pair[0].name))
+@@ -179,6 +197,12 @@ def main(argv: list[str]) -> int:
+ 
+     payload = {"programmes": programmes,
+                "electiveCatalogue": elective_catalogue,
++               # {sem: {code: {block, periods}}} -- lecture periods only, the
++               # public School timetable; the rule that reads it is per programme.
++               "timetable": {str(sem): {c: {"block": v["block"],
++                                            "periods": sorted(v["periods"])}
++                                        for c, v in sorted(mods.items())}
++                             for sem, mods in sorted(timetable.items())},
+                "source": "reg_advisor (submodule) — single source of truth"}
+ 
+     html = TEMPLATE.read_text()
+diff --git a/scripts/explorer_template.html b/scripts/explorer_template.html
+index e05fe14..6a989f3 100644
+--- a/scripts/explorer_template.html
++++ b/scripts/explorer_template.html
+@@ -130,6 +130,9 @@ main{
+ .cell[data-elig="concession"]{background:var(--conc-fill); border-color:var(--conc-ink);
+   background-image:none}
+ .cell[data-elig="concession"] .code{color:var(--conc-ink)}
++.cell[data-elig="clash"]{background:var(--amber-bg); border-color:var(--must-bar);
++  background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(133,79,11,.07) 5px 6px)}
++.cell[data-elig="clash"] .code{color:var(--must-bar)}
+ .cell[data-kind="dp"]{border-style:dashed}
+ .cell[data-kind="elective"]{border-style:dotted}
+ .cell[data-kind="elective"] .code{color:var(--blue)}
+@@ -164,6 +167,7 @@ aside h2{
+ .verdict.blocked{border-left-color:var(--fail-ink)}
+ .verdict.done{border-left-color:var(--pass-ink)}
+ .verdict.concession{border-left-color:var(--conc-ink); background:var(--conc-fill)}
++.verdict.clash{border-left-color:var(--must-bar); background:var(--amber-bg)}
+ .verdict b{font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+   text-transform:uppercase; display:block; margin-bottom:3px}
+ .verdict ul{margin:6px 0 0; padding-left:16px}
+@@ -219,6 +223,7 @@ footer .v{font-weight:600}
+ .keybar .sw.blocked{background:var(--block-fill);
+   background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.06) 3px 4px)}
+ .keybar .sw.conc{background:var(--conc-fill); border-color:var(--conc-ink)}
++.keybar .sw.clash{background:var(--amber-bg); border-color:var(--must-bar)}
+ .keybar .sw.dp{border-style:dashed}
+ .keybar .note{font-style:italic; color:var(--ink3)}
+ 
+@@ -388,11 +393,12 @@ footer .v{font-weight:600}
+   <span class="kk"><i class="sw"></i>May register</span>
+   <span class="kk"><i class="sw conc"></i>Concession possible</span>
+   <span class="kk"><i class="sw blocked"></i>Blocked — prerequisites unmet</span>
++  <span class="kk"><i class="sw clash"></i>Timetable clash — take the lower level first</span>
+   <span class="kk"><i class="sw review"></i>Review — see coordinator</span>
+   <span class="kk"><i class="sw dp"></i>DP (no credit)</span>
+   <span class="kk"><i class="sw plan"></i>In my registration plan (tick the box on a card)</span>
+   <span class="spacer"></span>
+-  <span class="note">Prerequisites &amp; progression only — not load limits or term decisions.</span>
++  <span class="note">Prerequisites, progression &amp; timetable clashes — not load limits or term decisions.</span>
+ </div>
+ 
+ <main>
+@@ -504,7 +510,8 @@ const VERDICT = {
+   can_register:        {elig:"may",        tag:"MAY",        may:true},
+   concession_possible: {elig:"concession", tag:"CONCESSION", may:false},
+   needs_review:        {elig:"review",     tag:"REVIEW",     may:false},
+-  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false}
++  cannot_register:     {elig:"blocked",    tag:"BLOCKED",    may:false},
++  timetable_clash:     {elig:"clash",      tag:"CLASH",      may:false}
+ };
+ 
+ /* build reg_advisor's transcript index from entered marks, then overlay the
+@@ -622,12 +629,21 @@ function bandCredits(sem, t){
+ const sheet = document.getElementById("sheet");
+ const M = () => modMap();
+ 
++/* Every module's verdict for one transcript index, computed once. The clash
++   rule (TTC-v1) is a property of the whole set -- a module gives way only to
++   another the student may also register -- so verdicts are worked out
++   together, as reg_advisor's eval_advice does, then read one at a time. */
++const ADVICE = new WeakMap();
++function adviceFor(t){
++  if(!ADVICE.has(t)) ADVICE.set(t, RA.adviseAll(prog().modules, t, rules(), PAYLOAD.timetable));
++  return ADVICE.get(t);
++}
+ function eligOf(code, t){
+   const m = M()[code];
+   if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective")
+     return {verdict:"elective", elig:"may", tag:"ELECTIVE", pc:{missing:[],unmet:[]}, repeat:false};
+-  const r = RA.verdictFor(m, t, rules());
+-  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat};
++  const r = adviceFor(t)[code];
++  return {verdict:r.verdict, ...VERDICT[r.verdict], pc:r.pc, repeat:!!r.repeat, clash:r.clash};
+ }
+ 
+ function render(){
+@@ -683,7 +699,8 @@ function render(){
+       if(e.verdict === "can_register" && !e.repeat) may++;
+       else if(e.verdict === "can_register" && e.repeat) must++;
+       else if(e.verdict === "concession_possible") conc++;
+-      else if(e.verdict === "cannot_register" || e.verdict === "needs_review") blocked++;
++      else if(e.verdict === "cannot_register" || e.verdict === "needs_review"
++              || e.verdict === "timetable_clash") blocked++;
+ 
+       const mk = marks[code];
+       const st = mk == null ? "none" : (mk >= passMark() ? "passed" : "failed");
+@@ -697,7 +714,8 @@ function render(){
+       b.dataset.kind = m.isDp ? "dp" : (m.type === "elective" ? "elective" : "degree");
+       if(m.choice) b.dataset.choice = m.choice;
+       if(code === selected) b.classList.add("selected");
+-      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review");
++      const hidden = filters.blocked && !(e.verdict==="cannot_register"||e.verdict==="needs_review"
++                                          ||e.verdict==="timetable_clash");
+       if(hidden) b.classList.add("dim");
+       const tag = m.isDp ? "DP"
+         : m.type === "elective" ? (pickOf(code) ? "CHOSEN" : "CHOOSE")
+@@ -800,7 +818,8 @@ function renderInspector(t){
+   }
+   const m = M()[selected];
+   const e = eligOf(selected, t);
+-  const reasons = (e.pc && e.pc.unmet) ? e.pc.unmet : [];
++  const reasons = e.verdict === "timetable_clash" ? []
++                : (e.pc && e.pc.unmet) ? e.pc.unmet : [];
+   const dependents = prog().modules
+     .filter(mm => JSON.stringify(mm.prereqs||"").includes(`"${selected}"`))
+     .map(mm => mm.code);
+@@ -816,6 +835,14 @@ function renderInspector(t){
+                            ? ["Talk to your coordinator",
+                               "Registration for this module is arranged with the Programme Coordinator. The tool shows what is still outstanding, but it does not make the final call — take your record to the coordinator before you register."]
+                            : ["Blocked", "You can't register yet — these prerequisites are outstanding:"],
++    timetable_clash:     e.clash
++                           ? ["Timetable clash",
++                              `${selected} meets at the same time as ${e.clash.with.join(", ")} `
++                              + `(block ${e.clash.block || "?"}: ${e.clash.periods.join(" ")}). `
++                              + `You meet the prerequisites for both, but the rule is to take the `
++                              + `lower-level module first: register ${e.clash.with.join(", ")} and `
++                              + `leave ${selected} for when it no longer clashes.`]
++                           : ["Timetable clash", ""],
+     elective:            ["Elective", "Take it in any semester; any module matching this bucket counts."]
+   }[e.verdict];
+ 
+@@ -878,13 +905,15 @@ function drawLeaders(){
+   if(!selected) return;
+   const t = tx();
+   const e = eligOf(selected, t);
+-  if(e.verdict !== "cannot_register") return;
++  if(e.verdict !== "cannot_register" && e.verdict !== "timetable_clash") return;
+   const wrap = document.querySelector(".sheet-wrap").getBoundingClientRect();
+   const from = document.querySelector(`.cell[data-code="${selected}"]`);
+   if(!from) return;
+   const f = from.getBoundingClientRect();
+   const x1 = f.left - wrap.left + f.width/2, y1 = f.top - wrap.top;
+-  for(const ref of new Set((e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">")))){
++  const refs = e.verdict === "timetable_clash" ? (e.clash ? e.clash.with : [])
++    : (e.pc.missing||[]).filter(x=>!String(x).includes(":") && !String(x).includes(">"));
++  for(const ref of new Set(refs)){
+     const to = document.querySelector(`.cell[data-code="${ref}"]`);
+     if(!to) continue;
+     to.classList.add("culprit");
+@@ -918,6 +947,7 @@ const OUTCOME = {
+   concession_possible: "Concession possible",
+   needs_review:        "Review — see coordinator",
+   cannot_register:     "Blocked",
++  timetable_clash:     "Timetable clash — take the lower level first",
+   elective:            "Elective — choose"
+ };
+ 
+@@ -1029,6 +1059,7 @@ function buildPrintout(t){
+   const planConc  = planned.filter(x => x.e.verdict === "concession_possible");
+   const planStop  = planned.filter(x => x.e.verdict === "cannot_register"
+                                      || x.e.verdict === "needs_review"
++                                     || x.e.verdict === "timetable_clash"
+                                      || x.e.verdict === "passed");
+   const planCr    = plannedCredits();
+   const normal    = normalLoadNext();
+@@ -1042,7 +1073,8 @@ function buildPrintout(t){
+   const blocked = [];
+   for(const sem of orderedSems()) for(const code of sem.modules){
+     const e = eligOf(code, t);
+-    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"))
++    if(!plan.has(code) && (e.verdict === "cannot_register" || e.verdict === "needs_review"
++                           || e.verdict === "timetable_clash"))
+       blocked.push({code, m:mm[code], e, sem});
+   }
+ 
+@@ -1050,7 +1082,8 @@ function buildPrintout(t){
+   /* Reasons come back as raw expressions. The capstone gate's reason names every
+      core module, so clip anything longer than a line an adviser would read. */
+   const clip = s => { s = String(s); return s.length > 110 ? s.slice(0,107) + "…" : s; };
+-  const why    = e => (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
++  const why    = e => e.clash ? clip(e.clash.reason)
++                    : (e.pc && e.pc.unmet && e.pc.unmet.length) ? clip(e.pc.unmet.join("; "))
+                     : (e.pc && e.pc.missing && e.pc.missing.length)
+                         ? clip("outstanding: " + e.pc.missing.join(", "))
+                     : "—";
+@@ -1147,7 +1180,7 @@ function buildPrintout(t){
+           eligible.map(listRow).join("")}</tbody></table>`
+       : `<p class="none">None.</p>`)}
+ 
+-  ${blocked.length ? section("E · Blocked — outstanding prerequisites",
++  ${blocked.length ? section("E · Blocked — outstanding prerequisites or a timetable clash",
+     `<table>${head("Code","Module","Cr","Slot","Outstanding")}<tbody>${
+       blocked.slice(0,14).map(listRow).join("")}</tbody></table>`
+      + (blocked.some(e => isReferred(e.code))
+@@ -1169,9 +1202,10 @@ function buildPrintout(t){
+     <div class="notes"><span class="lb">Adviser notes / amendments</span><div class="notebox"></div></div>
+   </div>
+ 
+-  <p class="print-note">Scope: prerequisites and cumulative progression credits only.
+-    This record does not apply term decisions, ERS academic standing, credit caps or timetable
+-    clashes, and it is not a registration. Final registration is subject to Faculty approval.
++  <p class="print-note">Scope: prerequisites, cumulative progression credits and timetable
++    clashes (where two modules meet at the same time, the lower level is taken first).
++    This record does not apply term decisions, ERS academic standing or credit caps, and it
++    is not a registration. Final registration is subject to Faculty approval.
+     Produced by the CE registration advisory explorer · ${esc(date)}.</p>`;
+ }
+ 
+@@ -1232,12 +1266,12 @@ document.getElementById("print").addEventListener("click", () => window.print())
+     const mm = {}; p.modules.forEach(x=>mm[x.code]=x);
+     for(const c of cases){
+       const t = RA.indexMarks(c.marks, mm, p.passMark ?? 50, p.equivalences, 7);
++      const adv = RA.adviseAll(p.modules, t, p.rules||{}, PAYLOAD.timetable);
+       for(const m of p.modules){
+         if(m.type==="elective"||m.type==="free_elective"||m.type==="core_elective") continue;
+         total++;
+-        const r = RA.verdictFor(m, t, p.rules||{});
+         const want = c.buckets[m.code] || "cannot_register";
+-        if(r.verdict === want) pass++;
++        if(adv[m.code].verdict === want) pass++;
+       }
+     }
+   }
+diff --git a/scripts/ra_engine.js b/scripts/ra_engine.js
+index 903fc7b..b690d7c 100644
+--- a/scripts/ra_engine.js
++++ b/scripts/ra_engine.js
+@@ -1,6 +1,7 @@
+ /* ra_engine.js — a faithful mirror of reg_advisor/scripts/regadvisor_engine.py.
+    reg_advisor is the single source of truth; this file re-implements eval_term,
+-   check_prereqs, carry_ok, unmet_count and the four-bucket verdict exactly, so
++   check_prereqs, carry_ok, unmet_count, the four-bucket verdict and the
++   timetable clash rule (find_clashes / apply_timetable) exactly, so
+    the explorer page agrees with the advisor. build_explorer.py embeds parity
+    cases computed by the PYTHON engine; the page re-runs them and reports parity.
+ 
+@@ -220,7 +221,119 @@ function indexMarks(marksByCode, modByCode, passMark, equivalences, coreLen){
+           year_of_study:0, semesters_registered:0, core_len:coreLen};
+ }
+ 
++/* ---- timetable clashes (TTC-v1) -------------------------------------------
++   Mirror of regadvisor_engine.clash_timetable / find_clashes / apply_timetable.
++   Two modules that share a lecture period cannot both be registered: the
++   lower level stays, the higher level gives way; equal levels go to a person.
++   timetable: {"1": {code: {block, periods:[...]}}, "2": {...}} */
++var DEFAULT_TIMETABLE_RULE = {enabled:true, exempt:[], rule_id:"TTC-v1"};
++var DAY = {Mon:0, Tue:1, Wed:2, Thu:3, Fri:4};
++
++function sortPeriods(ps){
++  var key = function(p){ p = String(p); var d = DAY[p.slice(0,3)];
++    return [d == null ? 9 : d, parseInt(p.slice(3), 10) || 0]; };
++  return ps.slice().sort(function(a, b){
++    var ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
++}
++
++function clashTimetable(timetable, ruleIn){
++  var rule = Object.assign({}, DEFAULT_TIMETABLE_RULE, ruleIn || {});
++  if(!timetable || !Object.keys(timetable).length || !rule.enabled) return {tt:{}, rule:rule};
++  var skip = new Set((rule.exempt || []).map(String));
++  var tt = {};
++  Object.keys(timetable).forEach(function(s){
++    tt[s] = {};
++    Object.keys(timetable[s]).forEach(function(c){ if(!skip.has(c)) tt[s][c] = timetable[s][c]; });
++  });
++  return {tt:tt, rule:rule};
++}
++
++function findClashes(codes, sem, timetable, levelOf){
++  levelOf = levelOf || codeLevel;
++  var slots = (timetable || {})[String(sem)] || {};
++  var seen = new Set(), placed = [];
++  codes.forEach(function(c){ if(!seen.has(c)){ seen.add(c); if(slots[c]) placed.push(c); } });
++  placed.sort(function(a, b){ return (levelOf(a) - levelOf(b)) || (a < b ? -1 : a > b ? 1 : 0); });
++  var keep = [], drop = [], ties = [];
++  var shared = function(a, b){
++    var pb = new Set(slots[b].periods); return slots[a].periods.filter(function(p){ return pb.has(p); }); };
++  placed.forEach(function(c){
++    var hits = keep.filter(function(k){ return shared(c, k).length; });
++    var lower = hits.filter(function(k){ return levelOf(k) < levelOf(c); });
++    if(lower.length){
++      var ps = new Set();
++      lower.forEach(function(k){ shared(c, k).forEach(function(p){ ps.add(p); }); });
++      drop.push({code:c, "with":lower, block:slots[c].block, periods:sortPeriods([...ps])});
++      return;
++    }
++    hits.forEach(function(k){
++      ties.push({codes:[k, c], block:slots[c].block, periods:sortPeriods(shared(c, k))}); });
++    keep.push(c);
++  });
++  return {keep:keep, drop:drop, ties:ties};
++}
++
++function clashReason(d, ruleId){
++  ruleId = ruleId || "TTC-v1";
++  if(d.tie) return "timetable clash at the same level with " + d["with"].join(", ")
++    + " (" + d.periods.join(" ") + "): needs a person [" + ruleId + "]";
++  return "timetable clash with " + d["with"].join(", ") + " (block " + (d.block || "?") + ", "
++    + d.periods.join(" ") + "): take the lower-level " + d["with"].join(", ")
++    + " first, deregister " + d.code + " [" + ruleId + "]";
++}
++
++/* verdicts: {code: {verdict, pc, repeat}} for the programme's modules, as
++   verdictFor returns them. Moves the higher module of each clash to
++   "timetable_clash" and same-level clashes to "needs_review", in place. */
++function applyTimetable(verdicts, modules, timetable, ruleIn){
++  var ct = clashTimetable(timetable, ruleIn), tt = ct.tt, rule = ct.rule;
++  if(!Object.keys(tt).length) return verdicts;
++  var byCode = {}; modules.forEach(function(m){ byCode[m.code] = m; });
++  var levelOf = function(c){ var m = byCode[c];
++    return m && typeof m.level === "number" ? m.level : codeLevel(c); };
++  var live = new Set(["can_register", "concession_possible", "needs_review"]);
++  var bySem = {};
++  modules.forEach(function(m){
++    var v = verdicts[m.code];
++    if(v && live.has(v.verdict) && typeof m.sem === "number")
++      (bySem[m.sem] = bySem[m.sem] || []).push(m.code);
++  });
++  Object.keys(bySem).sort().forEach(function(sem){
++    var res = findClashes(bySem[sem], sem, tt, levelOf);
++    res.drop.forEach(function(d){
++      var v = verdicts[d.code];
++      v.clash = Object.assign({}, d, {sem:+sem, was:v.verdict, rule_id:rule.rule_id,
++                                      reason:clashReason(d, rule.rule_id)});
++      v.verdict = "timetable_clash";
++    });
++    res.ties.forEach(function(t){
++      t.codes.forEach(function(code){
++        var tie = {code:code, "with":t.codes.filter(function(x){ return x !== code; }),
++                   block:t.block, periods:t.periods, tie:true};
++        var v = verdicts[code];
++        v.clash = Object.assign({}, tie, {sem:+sem, rule_id:rule.rule_id,
++                                          reason:clashReason(tie, rule.rule_id)});
++        v.verdict = "needs_review";
++      });
++    });
++  });
++  return verdicts;
++}
++
++/* every prescribed module's verdict with the clash rule applied -- the mirror
++   of eval_advice as a whole, which the per-module verdictFor cannot be. */
++function adviseAll(modules, tx, rules, timetable){
++  var out = {};
++  modules.forEach(function(m){
++    if(m.type === "elective" || m.type === "free_elective" || m.type === "core_elective") return;
++    out[m.code] = verdictFor(m, tx, rules);
++  });
++  return applyTimetable(out, modules, timetable, (rules || {}).timetable);
++}
++
+ root.RA = {coreCode:coreCode, codeLevel:codeLevel, evalTerm:evalTerm,
+            unmetCount:unmetCount, carryOk:carryOk, checkPrereqs:checkPrereqs,
+-           verdictFor:verdictFor, indexMarks:indexMarks};
++           verdictFor:verdictFor, indexMarks:indexMarks,
++           findClashes:findClashes, applyTimetable:applyTimetable,
++           clashReason:clashReason, adviseAll:adviseAll};
+ })(typeof window !== "undefined" ? window : globalThis);
+diff --git a/scripts/vendor_sync.py b/scripts/vendor_sync.py
+index eeaaa78..0bafe64 100644
+--- a/scripts/vendor_sync.py
++++ b/scripts/vendor_sync.py
+@@ -37,6 +37,7 @@ FILES: dict[str, str] = {
+     "scripts/programme_loader.py":   "scripts/_ra/programme_loader.py",
+     "scripts/regadvisor_engine.py":  "scripts/_ra/regadvisor_engine.py",
+     "catalogue/modules.yaml":        "catalogue/modules.yaml",
++    "catalogue/timetable.yaml":      "catalogue/timetable.yaml",
+     "programmes/civil.yaml":         "programmes/civil.yaml",
+     "programmes/augmented_civil.yaml": "programmes/augmented_civil.yaml",
+ }
+-- 
+2.43.0
+

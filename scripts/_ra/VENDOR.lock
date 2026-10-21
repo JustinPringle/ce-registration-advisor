@@ -1,26 +1,30 @@
 {
   "branch": "backend_dev",
-  "commit": "d07fa15dcf7a187dfbfcab7e32eef16eaacc282e",
+  "commit": "9e47a7331dd699a02a578abd7023cc14d99dbbdc",
   "files": {
     "catalogue/modules.yaml": {
       "from": "catalogue/modules.yaml",
       "sha256": "4d38a5ccdb9dba74e459ce8834a1cf72a0bd3065940ec389e62025bcaa749183"
     },
+    "catalogue/timetable.yaml": {
+      "from": "catalogue/timetable.yaml",
+      "sha256": "db32eb073017c2357e7f946a45a5a6856ead31bcc859e9624bee126bf28975aa"
+    },
     "programmes/augmented_civil.yaml": {
       "from": "programmes/augmented_civil.yaml",
-      "sha256": "9b8b6311dc3ec8e69e310fb8c4c4829b5fd71a58e6e12df61e261001f9a23422"
+      "sha256": "8e6277f828cfb3499eecb96f5b4ce38cd979cdfbb0aaaeaf4819aa6560a528ce"
     },
     "programmes/civil.yaml": {
       "from": "programmes/civil.yaml",
-      "sha256": "e4881ec86c9895b96d5868078aee98669649d33c9107c25db793c1d36b3c44de"
+      "sha256": "a3da239ef007bcd6ec48e37c0da1ca6f23eef09d55c2f100b1495ac4e68389e1"
     },
     "scripts/_ra/programme_loader.py": {
       "from": "scripts/programme_loader.py",
-      "sha256": "0d54ae1e59f22cc24700c3cdd86b81eb319276ce07455b6ab5b4de573a9884c2"
+      "sha256": "8ac59a39b8ba65f4c409370589e179be4080c8132c33fffa17971d805e4797a8"
     },
     "scripts/_ra/regadvisor_engine.py": {
       "from": "scripts/regadvisor_engine.py",
-      "sha256": "f8878519b9a79a522b6e060fee6a0bb63b9fb596a40a1ea6922bfbaddb5b9055"
+      "sha256": "8e4eb13b732e91a38e1074fa2cc80bdae22ea97a0cd2859b5e53df53f67f391d"
     }
   },
   "upstream": "/Users/justinpringle/Developer/reg_advisor"

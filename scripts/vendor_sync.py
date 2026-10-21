@@ -37,6 +37,7 @@ FILES: dict[str, str] = {
     "scripts/programme_loader.py":   "scripts/_ra/programme_loader.py",
     "scripts/regadvisor_engine.py":  "scripts/_ra/regadvisor_engine.py",
     "catalogue/modules.yaml":        "catalogue/modules.yaml",
+    "catalogue/timetable.yaml":      "catalogue/timetable.yaml",
     "programmes/civil.yaml":         "programmes/civil.yaml",
     "programmes/augmented_civil.yaml": "programmes/augmented_civil.yaml",
 }

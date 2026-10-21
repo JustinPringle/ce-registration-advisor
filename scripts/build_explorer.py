@@ -42,6 +42,11 @@ ENGINE_JS = Path(__file__).with_name("ra_engine.js")
 # or zero where the programme file no longer states them. Absent catalogue is a
 # build failure here, not a degraded page.
 CATALOGUE = ROOT / "catalogue" / "modules.yaml"
+# The lecture timetable (periods per module per semester), generated upstream by
+# reg_advisor's scripts/build_timetable.py and vendored beside the catalogue.
+# Passed explicitly for the same reason: the loader's default would miss it, and
+# a missing timetable is silent -- the clash rule would simply never fire.
+TIMETABLE = ROOT / "catalogue" / "timetable.yaml"
 
 PROFILES = [
     {},
@@ -60,6 +65,10 @@ PROFILES = [
     # concession gate.
     {"CHEM181": 78, "ENCH1TC": 78, "ENME1DR": 78, "MATH131": 30,
      "MATH132": 78, "PHYS151": 78, "CHEM191": 76, "MATH141": 76},
+    # Timetable clash (TTC-v1). MATH141 (L1) is still outstanding and open, and
+    # ENCV3G1 is passed, so ENCV3G2 (L3) is open too -- both meet in block F in
+    # semester 2, and the higher level must give way.
+    {"MATH131": 60, "ENCV3G1": 70},
 ]
 
 
@@ -78,7 +87,9 @@ def programme_payload(cur: dict) -> dict:
             "isDp": bool(m.get("is_dp")),
             "type": m.get("type", "prescribed"),
             "choice": m.get("choice") or None,
-            "level": eng.code_level(m["code"]),
+            # The engine's level, not the code's first digit: the clash rule
+            # keeps the lower level, so the page must rank modules as it does.
+            "level": eng.module_level(cur, m["code"]),
         }
         for m in cur.get("modules", [])
     ]
@@ -99,7 +110,8 @@ def programme_payload(cur: dict) -> dict:
         # that replaced it is a coordinator decision (it depends on the
         # completion route), so the page does not carry it either.
         "rules": {"concession": (rules.get("concession") or {}),
-                  "electives": (rules.get("electives") or {})},
+                  "electives": (rules.get("electives") or {}),
+                  "timetable": (rules.get("timetable") or {})},
         "progression": progression,
         "equivalences": equivalences,
         "modules": modules,
@@ -125,7 +137,7 @@ def parity_for(cur: dict) -> list[dict]:
         adv = eng.eval_advice(cur, tx)
         buckets = {}
         for bucket in ("can_register", "concession_possible", "cannot_register",
-                       "needs_review", "passed"):
+                       "needs_review", "timetable_clash", "passed"):
             for m in adv[bucket]:
                 buckets[m["code"]] = bucket
         cases.append({"marks": prof, "gpa": tx["gpa"],
@@ -145,10 +157,16 @@ def main(argv: list[str]) -> int:
         sys.exit(f"module catalogue not found at {CATALOGUE}\n"
                  f"Copy it from reg_advisor (catalogue/modules.yaml) — the "
                  f"programme YAMLs no longer carry module facts of their own.")
+    if not TIMETABLE.exists():
+        sys.exit(f"timetable not found at {TIMETABLE}\n"
+                 f"Run scripts/vendor_sync.py — without it the page would advise "
+                 f"students to register modules that meet at the same time.")
 
     # Mainstream first: the page opens on the first key, and alphabetical file
     # order would otherwise land every student on the augmented programme.
-    loaded = [(y, pl.load_programme(str(y), catalogue=str(CATALOGUE))) for y in yamls]
+    timetable = pl.load_timetable(str(TIMETABLE))
+    loaded = [(y, pl.load_programme(str(y), catalogue=str(CATALOGUE), timetable=timetable))
+              for y in yamls]
     loaded.sort(key=lambda pair: (
         "augment" in (pair[1].get("programme", {}).get("name", "").lower()),
         pair[0].name))
@@ -179,6 +197,12 @@ def main(argv: list[str]) -> int:
 
     payload = {"programmes": programmes,
                "electiveCatalogue": elective_catalogue,
+               # {sem: {code: {block, periods}}} -- lecture periods only, the
+               # public School timetable; the rule that reads it is per programme.
+               "timetable": {str(sem): {c: {"block": v["block"],
+                                            "periods": sorted(v["periods"])}
+                                        for c, v in sorted(mods.items())}
+                             for sem, mods in sorted(timetable.items())},
                "source": "reg_advisor (submodule) — single source of truth"}
 
     html = TEMPLATE.read_text()
